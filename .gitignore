@@ -1,0 +1,9 @@
+node_modules/
+dist/
+tests/smoke/dist/
+tests/smoke/artifacts/
+tests/smoke/*.png
+.env
+.env.*
+!.env.example
+*.log

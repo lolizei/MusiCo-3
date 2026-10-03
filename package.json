@@ -1,0 +1,41 @@
+{
+  "name": "beat-exe",
+  "private": true,
+  "version": "0.1.0",
+  "description": "BEAT.EXE \u2014 a cute hacker-terminal live coding music editor powered by Strudel",
+  "type": "module",
+  "license": "AGPL-3.0-or-later",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/unit/*.test.ts",
+    "test:smoke": "npm run build && node tests/smoke/build.mjs && node tests/smoke/smoke.mjs && node tests/smoke/real.mjs",
+    "test:audio": "npm run build && node tests/smoke/audio.mjs",
+    "test:endurance": "npm run build && node tests/smoke/endurance.mjs"
+  },
+  "dependencies": {
+    "@codemirror/autocomplete": "^6.18.0",
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-javascript": "^6.2.2",
+    "@codemirror/language": "^6.10.0",
+    "@codemirror/state": "^6.4.1",
+    "@codemirror/view": "^6.34.0",
+    "@lezer/highlight": "^1.2.0",
+    "@strudel/web": "^1.2.0",
+    "codemirror": "^6.0.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0"
+  }
+}

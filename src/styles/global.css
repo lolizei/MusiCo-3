@@ -1,0 +1,623 @@
+/* BEAT.EXE — every color comes from theme variables set by themes/themes.ts.
+   Defaults below are the Midnight Terminal theme so the first paint is correct. */
+:root {
+  --bg: #090b12;
+  --bg-raised: #0f1320;
+  --fg: #9df7c0;
+  --fg-muted: #5e9c7b;
+  --accent: #ffafd7;
+  --highlight: #7de3f4;
+  --error: #ff8a98;
+  --warn: #f5d48a;
+  --border: #2c5545;
+  --selection: #1e3a35;
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', 'IBM Plex Mono', 'Fira Code', ui-monospace, 'SF Mono', Menlo, Consolas,
+    'DejaVu Sans Mono', monospace;
+  --editor-font-size: 15px;
+  --ui-font-size: 14px;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--ui-font-size);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--highlight);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---- layout --------------------------------------------------------------- */
+
+.app {
+  height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) minmax(150px, 28vh) auto;
+  gap: 14px;
+  padding: 12px 14px 0;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  min-height: 0;
+}
+
+.workspace.with-panel {
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+}
+
+/* A frame looks like an ASCII box: double rule with its title sitting on the top edge. */
+.frame {
+  position: relative;
+  border: 3px double var(--border);
+  background: var(--bg);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding-top: 10px;
+}
+
+.frame-title {
+  position: absolute;
+  top: -0.8em;
+  left: 12px;
+  margin: 0;
+  padding: 0 6px;
+  background: var(--bg);
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: normal;
+  max-width: calc(100% - 24px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.frame-title::before {
+  content: '┤ ';
+  color: var(--border);
+}
+.frame-title::after {
+  content: ' ├';
+  color: var(--border);
+}
+
+/* ---- title bar & toolbar -------------------------------------------------- */
+
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.logo {
+  margin: 0;
+  font-size: 1.15rem;
+  letter-spacing: 0.35em;
+  color: var(--accent);
+  font-weight: bold;
+}
+
+.project-name {
+  margin: 0;
+  color: var(--fg);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-name > span[aria-hidden],
+.muted {
+  color: var(--fg-muted);
+}
+
+.dirty {
+  color: var(--warn);
+}
+
+.title-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.engine-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg-muted);
+}
+
+select {
+  background: var(--bg-raised);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  font: inherit;
+  padding: 2px 4px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  align-items: center;
+}
+
+.toolbar-gap {
+  width: 14px;
+}
+
+.tbtn {
+  background: transparent;
+  color: var(--fg);
+  border: 0;
+  font: inherit;
+  padding: 3px 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* inverse video on hover, like a selected item in a terminal menu */
+.tbtn:hover:not(:disabled) {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.tbtn-primary {
+  color: var(--accent);
+}
+.tbtn-primary:hover:not(:disabled) {
+  background: var(--accent);
+}
+
+.tbtn-danger {
+  color: var(--error);
+}
+.tbtn-danger:hover:not(:disabled) {
+  background: var(--error);
+}
+
+.tbtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 2px dashed var(--highlight);
+  outline-offset: 2px;
+}
+
+/* ---- editor ----------------------------------------------------------------- */
+
+.editor-frame {
+  padding: 12px 4px 4px;
+}
+
+.code-editor {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.code-editor .cm-editor {
+  height: 100%;
+}
+
+.code-editor .cm-editor.cm-focused {
+  outline: none;
+}
+
+/* ---- side panel --------------------------------------------------------------- */
+
+.side-panel {
+  padding: 14px 0 0;
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 8px 6px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.tab {
+  background: transparent;
+  border: 0;
+  color: var(--fg-muted);
+  font: inherit;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.tab-active {
+  color: var(--bg);
+  background: var(--fg);
+}
+
+.tab-close {
+  margin-left: auto;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.panel-body {
+  overflow: auto;
+  padding: 10px 14px 14px;
+  flex: 1;
+  min-height: 0;
+}
+
+.panel-body p {
+  margin: 0 0 8px;
+}
+
+.mascot {
+  color: var(--accent);
+  margin: 0 0 6px;
+  line-height: 1.2;
+}
+
+.step-count {
+  color: var(--fg-muted);
+}
+
+.step-title {
+  margin: 0 0 8px;
+  color: var(--highlight);
+  font-size: 1rem;
+}
+
+.code-preview {
+  background: var(--bg-raised);
+  border-left: 2px solid var(--border);
+  padding: 8px 10px;
+  margin: 8px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--highlight);
+  font-size: 0.85rem;
+}
+
+.step-nav {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+
+.snippet-list,
+.reference {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.hint {
+  color: var(--fg-muted);
+  margin-bottom: 8px;
+}
+
+.snippet {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dotted var(--border);
+  color: var(--fg);
+  font: inherit;
+  padding: 6px 2px;
+  cursor: pointer;
+}
+
+.snippet:hover {
+  background: var(--selection);
+}
+
+.snippet code {
+  display: block;
+  color: var(--highlight);
+  font-size: 0.8rem;
+  word-break: break-word;
+}
+
+.snippet-cat {
+  color: var(--accent);
+  font-size: 0.75rem;
+}
+
+.ref-item {
+  padding: 5px 0;
+  border-bottom: 1px dotted var(--border);
+}
+
+.ref-item dt code {
+  color: var(--highlight);
+}
+
+.ref-item dd {
+  margin: 2px 0 0;
+  color: var(--fg-muted);
+}
+
+/* ---- terminal ----------------------------------------------------------------- */
+
+.terminal {
+  padding: 12px 0 0;
+}
+
+.terminal-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tline-echo {
+  color: var(--fg-muted);
+}
+.tline-ok {
+  color: var(--fg);
+}
+.tline-info {
+  color: var(--highlight);
+}
+.tline-warn {
+  color: var(--warn);
+}
+.tline-error {
+  color: var(--error);
+}
+.tline-art {
+  color: var(--accent);
+  line-height: 1.2;
+}
+
+.terminal-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 8px;
+  border-top: 1px dashed var(--border);
+}
+
+.prompt {
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.terminal-input input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  color: var(--fg);
+  font: inherit;
+  caret-color: var(--accent);
+  outline: none;
+}
+
+.terminal-input input::placeholder {
+  color: var(--fg-muted);
+  opacity: 0.7;
+}
+
+/* ---- status bar --------------------------------------------------------------- */
+
+.statusbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 24px;
+  padding: 6px 2px 10px;
+  color: var(--fg-muted);
+  font-size: 0.85rem;
+}
+
+.state-playing {
+  color: var(--accent);
+}
+.state-error,
+.state-blocked {
+  color: var(--error);
+}
+.state-loading {
+  color: var(--warn);
+}
+.status-right {
+  margin-left: auto;
+}
+
+/* ---- dialogs ------------------------------------------------------------------ */
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg) 75%, transparent);
+  display: grid;
+  place-items: center;
+  z-index: 20;
+  padding: 16px;
+}
+
+.dialog {
+  width: min(520px, 100%);
+  max-height: 80vh;
+  padding: 20px 18px 14px;
+  background: var(--bg-raised);
+}
+
+.dialog .frame-title {
+  background: var(--bg-raised);
+}
+
+.dialog-message {
+  display: block;
+  margin: 0 0 12px;
+}
+
+.dialog-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font: inherit;
+  padding: 6px 8px;
+}
+
+.dialog-error {
+  color: var(--error);
+  margin: 8px 0 0;
+}
+
+.dialog-hint {
+  color: var(--fg-muted);
+  font-size: 0.8rem;
+  margin: 8px 0 0;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.picker {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  max-height: 50vh;
+  outline: none;
+}
+
+.picker-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+
+.picker-item[aria-selected='true'] {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.picker-detail {
+  color: var(--fg-muted);
+  font-size: 0.8rem;
+  text-align: right;
+}
+
+.picker-item[aria-selected='true'] .picker-detail {
+  color: var(--bg);
+}
+
+/* ---- optional effects ------------------------------------------------------- */
+/* The overlay never receives pointer events, so it can't block typing or clicks. */
+
+.crt-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 2px, rgb(0 0 0 / 0.18) 2px 3px),
+    radial-gradient(ellipse at center, transparent 60%, rgb(0 0 0 / 0.35) 100%);
+}
+
+.fx-crt .logo,
+.fx-crt .frame-title,
+.fx-crt .tline-art {
+  text-shadow: 0 0 6px color-mix(in srgb, currentColor 55%, transparent);
+}
+
+.fx-crt .cm-content,
+.fx-crt .terminal-log {
+  text-shadow: 0 0 3px color-mix(in srgb, var(--fg) 30%, transparent);
+}
+
+/* ---- small screens ------------------------------------------------------------ */
+
+@media (max-width: 760px) {
+  .app {
+    height: auto;
+    min-height: 100dvh;
+    grid-template-rows: auto auto auto 240px auto;
+  }
+  .workspace.with-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .editor-frame {
+    height: 55vh;
+  }
+  .side-panel {
+    max-height: 50vh;
+  }
+  .titlebar {
+    gap: 6px 12px;
+  }
+  .title-controls {
+    flex-wrap: wrap;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .engine-select {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .engine-select select {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .project-name {
+    order: 3;
+    flex-basis: 100%;
+  }
+  .toolbar-gap {
+    display: none;
+  }
+  .status-right {
+    margin-left: 0;
+  }
+}
+
+/* Command palette keeps long names readable at mobile widths. */
+.command-palette { width: min(680px, calc(100vw - 24px)); }
+.palette-results { max-height: min(50vh, 440px); }
+.palette-item { flex-direction: column; gap: 2px; padding: 8px; overflow-wrap: anywhere; }
+.palette-detail { font-size: 0.8rem; color: var(--fg-muted); }
+.palette-item[aria-selected='true'] .palette-detail { color: inherit; }
+.palette-item[aria-disabled='true'] { opacity: 0.5; cursor: not-allowed; }
