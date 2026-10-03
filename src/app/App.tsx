@@ -8,7 +8,8 @@ import type { EngineDiagnostic } from '../engines/types';
 import { openBrowserStorage } from '../projects/browserStorage';
 import { ProjectError, ProjectStore, validateName, type Project } from '../projects/store';
 import { useProjectSession } from '../projects/useProjectSession';
-import { EXAMPLES, getExample } from '../projects/examples';
+import { EXAMPLES, getExample, NEW_PROJECT_TEMPLATE } from '../projects/examples';
+import { SONIC_PI_TEMPLATE } from '../engines/sonic-pi/content';
 import { useSettings } from '../settings/useSettings';
 import { applySettingFromText } from '../settings/settings';
 import { THEMES } from '../themes/themes';
@@ -54,7 +55,9 @@ export default function App() {
   // ---- errors ---------------------------------------------------------------------
   const printError = useCallback(
     (diag: EngineDiagnostic, whilePlaying = false) => {
-      const ex = explainError(diag, STRUDEL_NAMES);
+      const ex = live.current.session.project.engine === 'sonic-pi'
+        ? { headline: `Sonic Pi error${diag.line ? ` on line ${diag.line}` : ''}`, line: diag.line, technical: diag.message, details: ['Check the Ruby code and the Sonic Pi connection.'] }
+        : explainError(diag, STRUDEL_NAMES);
       if (live.current.settings.beginnerMode) {
         print(whilePlaying ? 'ERROR WHILE PLAYING :(' : 'ERROR DETECTED :(', 'error');
         print(ex.headline, 'error');
@@ -96,7 +99,10 @@ export default function App() {
     const wasPlaying = engine.isPlaying();
     const res = await engine.run(code);
     if (res.ok) {
-      print(wasPlaying ? '↻ updated: your changes are applied without restarting playback' : '▶ playing ♡  (ctrl+. to stop)', 'ok');
+      print(wasPlaying ? engine.descriptor?.capabilities.liveUpdate
+        ? '↻ updated: your changes are applied without restarting playback'
+        : '↻ replaced the previous music (ctrl+. to stop)'
+        : '▶ playing ♡  (ctrl+. to stop)', 'ok');
     } else {
       printError(res.error);
       if (wasPlaying && engine.isPlaying()) print('the previous version keeps playing until you fix it or press stop', 'info');
@@ -295,7 +301,7 @@ export default function App() {
 
   const tryCode = useCallback(
     (title: string, code: string) =>
-      switchProject(() => live.current.session.loadCode(title, code), () => 'loaded into the editor. press ctrl+enter to hear it ♡'),
+      switchProject(() => live.current.session.loadCode(title, code, live.current.session.project.engine), () => 'loaded into the editor. press ctrl+enter to hear it ♡'),
     [switchProject],
   );
 
@@ -373,7 +379,9 @@ export default function App() {
       if (!d) return print(`unknown engine "${id}"`, 'warn');
       if (!d.available) return print(`${d.name}: ${d.unavailableReason}`, 'warn');
       if (d.id === session.project.engine) return print(`${d.name} is already the engine for this project`, 'info');
-      print(`${d.name} is the only available engine right now`, 'info');
+      switchProject(() => live.current.session.loadCode(d.id === 'sonic-pi' ? 'sonic-pi-song' : 'strudel-song',
+        d.id === 'sonic-pi' ? SONIC_PI_TEMPLATE : NEW_PROJECT_TEMPLATE, d.id),
+        () => `new ${d.name} project. ${d.id === 'sonic-pi' ? 'RUN connects to your separate Sonic Pi 5.0.0 installation.' : 'press ctrl+enter to play ♡'}`);
     },
     listThemes: () => THEMES.map((t) => ({ id: t.id, name: t.name, current: t.id === settings.themeId })),
     set: (key, value) => {
@@ -416,7 +424,7 @@ export default function App() {
     booted.current = true;
     print(BOOT_BANNER, 'art');
     print('SYSTEM BOOT COMPLETE...', 'info');
-    print('AUDIO ENGINE: STRUDEL', 'info');
+    print(`AUDIO ENGINE: ${getEngineDescriptor(session.project.engine)?.name.toUpperCase() ?? session.project.engine}`, 'info');
     print('press ctrl+enter to play · type help for commands', 'ok');
     if (!storage.persistent) {
       print('browser storage is blocked, so saved projects will vanish on reload. use export to keep your work.', 'warn');
@@ -466,7 +474,7 @@ export default function App() {
   );
 
   const playing = engine.state === 'playing';
-  const canRun = engine.available && engine.state !== 'error' && !!engine.descriptor?.capabilities.run;
+  const canRun = engine.available && (engine.state !== 'error' || session.project.engine === 'sonic-pi') && !!engine.descriptor?.capabilities.run;
 
   const paletteEntries = paletteOpen ? buildPaletteEntries({
     themes: THEMES, examples: EXAMPLES, projects: store.list(), engines: ENGINES, canRun, playing,
@@ -526,6 +534,7 @@ export default function App() {
           <CodeEditor
             ref={editorRef}
             initialCode={session.code}
+            language={engine.descriptor?.language}
             onChange={session.setCode}
             onRun={() => void run()}
             onStop={stop}
@@ -534,6 +543,8 @@ export default function App() {
         </section>
         {panelOpen && (
           <BeginnerPanel
+            key={session.project.engine}
+            engineId={session.project.engine}
             step={tutorialStep}
             onStepChange={setTutorialStep}
             onTryCode={tryCode}

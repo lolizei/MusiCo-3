@@ -81,7 +81,8 @@ performance on your own Brave profile/audio device.
 Ctrl+Shift+P opens the palette from the editor or terminal; COMMANDS also opens
 it. Try `th am`, select Amber CRT, and reload to check persistence. Use arrow
 keys and Enter; Escape should restore the previous focus. Search for Sonic Pi:
-it must stay disabled. Choose `set` to prepare terminal input. Choose save or
+it must stay disabled in the browser build; the Windows desktop build enables
+the separately installed engine. Choose `set` to prepare terminal input. Choose save or
 delete to verify their existing dialogs, including cancelling a deletion.
 The smoke suite covers these actions and verifies palette RUN evaluates once.
 
@@ -89,3 +90,57 @@ Acceptance record: on 2026-10-03 the user reported items 1–7 passed by ear in
 Brave, followed by “I think.” Treat this as qualified user confirmation; reopen
 any item if a listening issue is reported. Items 8–10 retain the manual scope
 described above.
+
+## Beginner note/melody guide
+
+    npm run test:beginner
+
+Uses the real production build, CodeMirror and Strudel. Checks the accessible
+note table, unsaved-work protection, snippet filtering/insertion/undo, CSS cat
+frames, reduced motion and animation settings, plus 320px/390px layouts.
+Evaluates all 53 snippets with suitable source patterns for effect fragments
+and measures nonzero output/headroom for all five melody starters. Listen to
+the starters yourself; automated PCM measurements are not listening acceptance.
+
+## Sonic Pi bridge
+
+    npm run test:sonic-pi -- "C:/Program Files/Sonic Pi"
+    node tests/smoke/sonic-pi-desktop.mjs "C:/Program Files/Sonic Pi"
+
+Requires a separate Sonic Pi **5.0.0** Windows installation. The runtime test
+boots the actual owned daemon in a temporary profile, records synth/drum PCM
+and STOP silence, exercises Ruby errors, rapid runs, queue cancellation, all
+four starters and reconnect. The desktop test exercises the packaged renderer,
+preload, selector, per-engine projects and restart/reconnect. Tests bypass the
+native consent/picker only in an isolated test profile with an explicit test
+installation path. That native UI still needs manual verification.
+
+Manual: select Sonic Pi, reject the native prompt and ensure no runtime starts;
+RUN again and accept/select the installed folder. Listen to all four starters,
+repeat RUN five times, STOP, try a Ruby error, reconnect, save/reopen, and switch
+between engines. Also verify stopping this app leaves a separate Sonic Pi GUI's
+music intact, and that closing the app leaves no owned runtime processes.
+Do not mark desktop/Sonic Pi audio accepted until the user confirms by ear.
+
+## Packaged Windows checks
+
+    npm run desktop:build
+    npm run test:desktop
+    node scripts/desktop-release.mjs
+    npm run test:distribution
+
+To repeat Sonic Pi desktop checks against that extracted copy as well, pass
+the separately installed runtime path:
+
+    npm run test:distribution -- "C:/Program Files/Sonic Pi"
+
+Desktop tests use isolated profiles. The packaged-app test covers the secure
+origin, renderer isolation, asset boundaries, real synth output/STOP silence,
+editor search/undo/redo, palette themes, saved projects and restart persistence.
+The distribution test extracts the final ZIP outside the project directory
+and repeats the desktop checks against that copy, including verifying source
+and customization guides are present. Debugging ports used by Playwright are
+test-only; normal launches do not open a debugging port or web server. Connecting
+Sonic Pi starts its owned runtime's loopback control sockets.
+After these checks, run the listening checklist in the desktop app: the Brave
+listening confirmation does not verify a separate desktop browser/audio device.

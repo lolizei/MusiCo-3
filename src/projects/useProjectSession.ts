@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ProjectError, validateName, type Draft, type Project, type ProjectStore } from './store';
 import { NEW_PROJECT_TEMPLATE, type Example } from './examples';
 import { DEFAULT_ENGINE_ID } from '../engines/registry';
+import { SONIC_PI_TEMPLATE } from '../engines/sonic-pi/content';
 
 const DRAFT_DELAY_MS = 600;
 
@@ -82,7 +83,8 @@ export function useProjectSession(store: ProjectStore) {
     (name?: string) => {
       const err = name ? validateName(name) : null;
       if (err) throw new ProjectError(err);
-      const p = store.create({ name: store.uniqueName(name ?? 'untitled'), engine: DEFAULT_ENGINE_ID, code: NEW_PROJECT_TEMPLATE });
+      const engine = latest.current.session.project.engine;
+      const p = store.create({ name: store.uniqueName(name ?? 'untitled'), engine, code: engine === 'sonic-pi' ? SONIC_PI_TEMPLATE : NEW_PROJECT_TEMPLATE });
       return load(p, false);
     },
     [store, load],
@@ -103,8 +105,8 @@ export function useProjectSession(store: ProjectStore) {
   );
 
   const loadCode = useCallback(
-    (name: string, newCode: string) =>
-      load(store.create({ name: store.uniqueName(name), engine: DEFAULT_ENGINE_ID, code: newCode }), false),
+    (name: string, newCode: string, engineId = DEFAULT_ENGINE_ID) =>
+      load(store.create({ name: store.uniqueName(name), engine: engineId, code: newCode }), false),
     [store, load],
   );
 

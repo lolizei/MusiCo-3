@@ -1,10 +1,11 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { basicSetup } from 'codemirror';
-import { redo, undo } from '@codemirror/commands';
+import { isolateHistory, redo, undo } from '@codemirror/commands';
 import { EditorView, keymap, Decoration, type DecorationSet } from '@codemirror/view';
-import { EditorState, Prec, StateEffect, StateField, EditorSelection, type Extension } from '@codemirror/state';
+import { Compartment, EditorState, Prec, StateEffect, StateField, EditorSelection, type Extension } from '@codemirror/state';
 import { javascript, javascriptLanguage } from '@codemirror/lang-javascript';
-import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { HighlightStyle, StreamLanguage, syntaxHighlighting } from '@codemirror/language';
+import { ruby } from '@codemirror/legacy-modes/mode/ruby';
 import { tags as t } from '@lezer/highlight';
 import { strudelCompletions } from './completions';
 import type { CodeEditorHandle, CodeEditorProps } from './types';
@@ -75,6 +76,9 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
   const viewRef = useRef<EditorView | null>(null);
   const propsRef = useRef(props);
   propsRef.current = props;
+  const language = useRef(new Compartment());
+  const languageExtensions = () => propsRef.current.language === 'ruby' ?
+    [StreamLanguage.define(ruby)] : [javascript(), javascriptLanguage.data.of({ autocomplete: strudelCompletions })];
 
   const buildExtensions = (): Extension[] => [
     Prec.highest(
@@ -85,8 +89,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
       ]),
     ),
     basicSetup,
-    javascript(),
-    javascriptLanguage.data.of({ autocomplete: strudelCompletions }),
+    language.current.of(languageExtensions()),
     terminalTheme,
     syntaxHighlighting(highlight),
     errorLineField,
@@ -116,6 +119,10 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    viewRef.current?.dispatch({ effects: language.current.reconfigure(languageExtensions()) });
+  }, [props.language]);
+
   useImperativeHandle(ref, () => ({
     getCode: () => viewRef.current?.state.doc.toString() ?? '',
     setCode: (code: string) => {
@@ -141,7 +148,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
         from = line.to;
         insert = line.text.trim() ? `\n${text}` : text;
       }
-      view.dispatch({ changes: { from, insert }, selection: EditorSelection.cursor(from + insert.length), scrollIntoView: true });
+      view.dispatch({ changes: { from, insert }, selection: EditorSelection.cursor(from + insert.length), scrollIntoView: true, annotations: isolateHistory.of('full') });
       view.focus();
     },
     focus: () => viewRef.current?.focus(),

@@ -245,6 +245,7 @@ select {
 
 .tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 2px;
   padding: 0 8px 6px;
   border-bottom: 1px dashed var(--border);
@@ -286,6 +287,29 @@ select {
   margin: 0 0 6px;
   line-height: 1.2;
 }
+
+.guide-cat { display: grid; width: fit-content; margin-bottom: 8px; }
+.cat-frame { grid-area: 1 / 1; visibility: hidden; margin: 0; }
+.cat-frame-0 { visibility: visible; }
+@keyframes cat-blink { 0%, 24.99% { visibility: visible; } 25%, 100% { visibility: hidden; } }
+@media (prefers-reduced-motion: no-preference) {
+  .fx-anim .cat-frame { visibility: hidden; animation: cat-blink 5s step-end infinite; }
+  .fx-anim .cat-frame-1 { animation-delay: -3.75s; }
+  .fx-anim .cat-frame-2 { animation-delay: -2.5s; }
+  .fx-anim .cat-frame-3 { animation-delay: -1.25s; }
+}
+.note-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.note-table caption { text-align: left; color: var(--accent); padding: 8px 0; }
+.note-table th, .note-table td { text-align: left; padding: 5px 3px; border-bottom: 1px dotted var(--border); }
+.note-table thead { color: var(--highlight); }
+.melody-heading { margin-top: 16px; }
+.melody-card { padding: 10px 0; border-bottom: 1px dotted var(--border); }
+.melody-card h4 { margin: 0 0 6px; color: var(--accent); }
+.snippet-filters { display: grid; gap: 8px; margin-bottom: 10px; }
+.snippet-filters label { display: grid; gap: 4px; }
+.snippet-category { display: grid; gap: 4px; }
+.snippet-filters input, .snippet-filters select { width: 100%; min-width: 0; padding: 5px; font: inherit; color: var(--fg); background: var(--bg-raised); border: 1px solid var(--border); }
+.snippet-info { display: block; margin-top: 3px; font-size: 0.8rem; color: var(--fg-muted); }
 
 .step-count {
   color: var(--fg-muted);

@@ -103,7 +103,7 @@ try {
   check('palette cancellation restores editor focus',await content.evaluate(el=>el===document.activeElement));
   await page.getByTestId('btn-palette').click();await query.fill('sonic');
   const unavailable=palette.locator('[data-palette-id="engine:sonic-pi"]');
-  check('unimplemented engine disabled in palette',await unavailable.getAttribute('aria-disabled')==='true');
+  check('desktop-only engine disabled in browser palette',await unavailable.getAttribute('aria-disabled')==='true');
   await unavailable.click({force:true});
   check('disabled action keeps palette open',await palette.isVisible());
   await query.fill('zzzzzzzzzz');await query.press('Enter');

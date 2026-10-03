@@ -54,6 +54,12 @@ export interface Snippet {
   code: string;
 }
 
+export function filterSnippets(snippets: readonly Snippet[], query: string, category = 'all'): Snippet[] {
+  const search = query.trim().toLowerCase();
+  return snippets.filter(snippet => (category === 'all' || snippet.category === category) &&
+    `${snippet.label} ${snippet.info} ${snippet.code}`.toLowerCase().includes(search));
+}
+
 export const SNIPPETS: Snippet[] = [
   { label: 'four on the floor', category: 'drums', info: 'Kick on every beat.', code: '$: s("bd*4")' },
   { label: 'backbeat', category: 'drums', info: 'Snare on beats 2 and 4.', code: '$: s("~ sd ~ sd")' },
@@ -72,4 +78,40 @@ export const SNIPPETS: Snippet[] = [
   { label: 'tempo', category: 'tempo', info: '120 beats per minute, 4 beats per cycle.', code: 'setcpm(120/4)' },
   { label: 'reverse', category: 'patterns', info: 'Play the pattern backwards.', code: '.rev()' },
   { label: 'euclid rhythm', category: 'patterns', info: '3 hits spread over 8 steps.', code: '$: s("bd").euclid(3,8)' },
+  { label: 'gentle kick', category: 'drums', info: 'Two quiet kicks per cycle.', code: '$: s("bd ~ bd ~").gain(0.3)' },
+  { label: 'offbeat hats', category: 'drums', info: 'Hats between the main beats.', code: '$: s("~ hh ~ hh ~ hh ~ hh").gain(0.2)' },
+  { label: 'skipping snare', category: 'drums', info: 'A double snare on the last beat.', code: '$: s("~ sd ~ [sd sd]").gain(0.3)' },
+  { label: 'kick conversation', category: 'drums', info: 'A different kick pattern every other cycle.', code: '$: s("<bd*4 [bd ~ bd bd]>").gain(0.35)' },
+  { label: 'tiny drum machine', category: 'drums', info: 'A complete quiet drum groove in one layer.', code: '$: stack(s("bd*4").gain(0.35), s("~ sd ~ sd").gain(0.25), s("hh*8").gain(0.15))' },
+  { label: 'three claps', category: 'drums', info: 'Three claps evenly spread over eight slots.', code: '$: s("cp").euclid(3,8).gain(0.25)' },
+  { label: 'warm sine bass', category: 'bass', info: 'Simple C and G bass with a built-in synth.', code: '$: note("c2 ~ g2 ~").s("sine").gain(0.3)' },
+  { label: 'walking major bass', category: 'bass', info: 'C, E, G and A underneath a major melody.', code: '$: note("c2 e2 g2 a2").s("triangle").gain(0.3)' },
+  { label: 'minor pulse', category: 'bass', info: 'Repeats a C minor root, then a low B-flat.', code: '$: note("c2 c2 c2 bb1").s("square").lpf(450).gain(0.2)' },
+  { label: 'two-bar bass', category: 'bass', info: 'Alternates C and A minor bass phrases.', code: '$: note("<[c2 e2 g2 e2] [a1 c2 e2 c2]>").s("sawtooth").lpf(600).gain(0.25)' },
+  { label: 'tiny staircase', category: 'melody', info: 'A rising and falling C major melody.', code: '$: note("c4 d4 e4 f4 e4 d4 c4 ~").s("triangle").gain(0.25)' },
+  { label: 'music box', category: 'melody', info: 'C major chord tones, one after another.', code: '$: note("c4 e4 g4 c5 g4 e4 c4 ~").s("sine").gain(0.25)' },
+  { label: 'sleepy cat', category: 'melody', info: 'A soft phrase with a little pause.', code: '$: note("g4 e4 d4 c4 ~ c4 d4 e4").s("triangle").gain(0.25)' },
+  { label: 'moonlight melody', category: 'melody', info: 'C minor with E-flat and B-flat.', code: '$: note("c4 eb4 g4 bb4 g4 eb4 d4 c4").s("triangle").gain(0.25)' },
+  { label: 'pentatonic playground', category: 'melody', info: 'Five-note C major scale; easy to rearrange.', code: '$: n("0 1 2 3 4 3 2 1").scale("C4:pentatonic").s("sine").gain(0.25)' },
+  { label: 'eight-bit hello', category: 'melody', info: 'Short square-wave notes, kept quiet.', code: '$: note("c5 ~ e5 g5 ~ e5 d5 c5").s("square").release(0.1).gain(0.15)' },
+  { label: 'question and answer', category: 'melody', info: 'Alternating phrases over two cycles.', code: '$: note("<[c4 d4 e4 g4] [g4 e4 d4 c4]>").s("triangle").gain(0.25)' },
+  { label: 'C major chord', category: 'chords', info: 'Three notes together; lower gain for stacked voices.', code: '$: note("[c4,e4,g4]").s("triangle").gain(0.15)' },
+  { label: 'C minor chord', category: 'chords', info: 'Replace E with E-flat for a minor color.', code: '$: note("[c4,eb4,g4]").s("triangle").gain(0.15)' },
+  { label: 'major to minor', category: 'chords', info: 'A C major chord followed by A minor.', code: '$: note("<[c4,e4,g4] [a3,c4,e4]>").s("sine").gain(0.15)' },
+  { label: 'slow pad', category: 'chords', info: 'A gentle C chord with a gradual attack.', code: '$: note("[c3,e3,g3]").s("triangle").attack(0.2).release(0.5).gain(0.15)' },
+  { label: 'quieter layer', category: 'effects', info: 'Append to a layer to lower its volume.', code: '.gain(0.25)' },
+  { label: 'soft attack', category: 'effects', info: 'Fade each note in over 0.1 seconds.', code: '.attack(0.1)' },
+  { label: 'short tail', category: 'effects', info: 'Fade notes out over 0.15 seconds.', code: '.release(0.15)' },
+  { label: 'pan left', category: 'effects', info: 'Move the layer toward the left speaker.', code: '.pan(0.2)' },
+  { label: 'pan right', category: 'effects', info: 'Move the layer toward the right speaker.', code: '.pan(0.8)' },
+  { label: 'remove low rumble', category: 'effects', info: 'Cuts frequencies below 200 Hz.', code: '.hpf(200)' },
+  { label: 'lo-fi crunch', category: 'effects', info: 'Reduce bit depth for a crunchy texture.', code: '.crush(6)' },
+  { label: 'half-speed phrase', category: 'patterns', info: 'Spread the pattern over two cycles.', code: '.slow(2)' },
+  { label: 'double-time phrase', category: 'patterns', info: 'Play the pattern twice per cycle.', code: '.fast(2)' },
+  { label: 'repeat every note', category: 'patterns', info: 'Repeat each event twice.', code: '.ply(2)' },
+  { label: 'rhythmic gaps', category: 'patterns', info: 'Give a layer a hit-rest-hit-hit structure.', code: '.struct("x ~ x x")' },
+  { label: 'gentle random gaps', category: 'random', info: 'Randomly skip about one in ten events.', code: '.degradeBy(0.1)' },
+  { label: 'sometimes backwards', category: 'random', info: 'Sometimes reverse the note order.', code: '.sometimes(x => x.rev())' },
+  { label: 'slow practice tempo', category: 'tempo', info: '80 BPM when counting four beats per cycle.', code: 'setcpm(80/4)' },
+  { label: 'dance practice tempo', category: 'tempo', info: '128 BPM when counting four beats per cycle.', code: 'setcpm(128/4)' },
 ];

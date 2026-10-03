@@ -1,0 +1,68 @@
+import { _electron as electron } from '@playwright/test';
+import assert from 'node:assert/strict';
+import { mkdtemp, readdir, mkdir } from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
+
+const root = path.resolve(process.argv[2]);
+const profile = await mkdtemp(path.join(os.tmpdir(), 'musico-sonic-desktop-'));
+const launch = () => electron.launch({ executablePath: path.resolve(process.argv[3] ?? 'release/win-unpacked/MusiCo-3.exe'),
+  env: { ...process.env, BEAT_TEST_USER_DATA: profile, BEAT_SONIC_PI_ROOT: root } });
+let app;
+let passed = 0;
+const check = (name, ok) => { assert.ok(ok, name); passed++; console.log(`PASS Sonic Pi desktop: ${name}`); };
+try {
+  app = await launch(); const page = await app.firstWindow();
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  const state = page.getByTestId('engine-state'); const editor = page.locator('.cm-content');
+  await state.filter({ hasText: 'ready' }).waitFor({ timeout: 60000 });
+  check('bridge exposes only its narrow API', await page.evaluate(() => Object.keys(window.sonicPi).sort().join(',') === 'connect,onEvent,run,stop'));
+  check('unconnected bridge cannot execute Ruby', await page.evaluate(async () => !(await window.sonicPi.run('play :c4')).ok));
+  await page.getByTestId('engine-select').selectOption('sonic-pi');
+  await state.filter({ hasText: 'unavailable' }).waitFor();
+  check('Sonic Pi creates a Ruby project', (await editor.textContent()).includes('live_loop :melody'));
+  check('guide offers Ruby snippets', (await page.locator('.side-panel').innerText()).includes('Sonic Pi ♡ Ruby music'));
+  check('selection does not start a native runtime', !(await readdir(profile)).includes('sonic-pi-runtime'));
+  await editor.press('Control+Enter');
+  await state.filter({ hasText: 'playing' }).waitFor({ timeout: 60000 });
+  await page.getByTestId('terminal-log').filter({ hasText: 'playing ♡' }).waitFor();
+  check('keyboard RUN connects and starts a real Sonic Pi job', (await page.getByTestId('terminal-log').innerText()).includes('playing ♡'));
+  await editor.press('Control+.'); await state.filter({ hasText: 'ready' }).waitFor();
+  check('keyboard STOP ends native playback', (await state.innerText()).includes('ready'));
+  await editor.press('Control+a'); await page.keyboard.insertText('play (');
+  await editor.press('Control+Enter');
+  await page.getByTestId('terminal-log').filter({ hasText: 'Sonic Pi error on line 1' }).waitFor();
+  check('Ruby error highlights the source line', await page.locator('.cm-beat-error-line').count() === 1);
+  await page.getByRole('button', { name: '[try kick and snare]', exact: true }).click();
+  await page.getByTestId('dialog-confirm').click();
+  check('Ruby guide preserves engine identity', await page.getByTestId('engine-select').inputValue() === 'sonic-pi' && (await editor.textContent()).includes('sample :bd_haus'));
+  await editor.press('Control+Enter'); await state.filter({ hasText: 'playing' }).waitFor();
+  await page.getByTestId('terminal-log').filter({ hasText: 'playing ♡' }).waitFor();
+  await page.waitForTimeout(600);
+  const updatesBefore = await page.getByTestId('terminal-log').evaluate(el => (el.textContent.match(/playing ♡|replaced the previous music/g) ?? []).length);
+  for (let i = 0; i < 5; i++) await editor.press('Control+Enter');
+  await page.waitForFunction(before => (document.querySelector('[data-testid="terminal-log"]').textContent.match(/playing ♡|replaced the previous music/g) ?? []).length >= before + 5, updatesBefore, { timeout: 30000 });
+  check('rapid updates recover without runtime errors', (await state.innerText()).includes('playing') && !(await page.getByTestId('terminal-log').innerText()).includes('No Sonic Pi job acknowledgement'));
+  await editor.press('Control+s'); await page.getByTestId('dialog-input').fill('ruby-test'); await page.getByTestId('dialog-confirm').click();
+  check('saved Ruby project records its engine', await page.evaluate(() => JSON.parse(localStorage.getItem('beatexe.projects.v1')).some(p => p.name === 'ruby-test' && p.engine === 'sonic-pi')));
+  await page.getByTestId('engine-select').selectOption('strudel');
+  await state.filter({ hasText: 'ready' }).waitFor();
+  check('switching back creates a Strudel project', (await editor.textContent()).includes('$:'));
+  await editor.press('Control+Enter'); await state.filter({ hasText: 'playing' }).waitFor();
+  check('Strudel still runs after Sonic Pi', (await state.innerText()).includes('playing'));
+  await editor.press('Control+.'); await state.filter({ hasText: 'ready' }).waitFor();
+  await mkdir('tests/smoke/artifacts', { recursive: true });
+  await page.getByTestId('engine-select').selectOption('sonic-pi');
+  await page.screenshot({ path: 'tests/smoke/artifacts/sonic-pi-desktop.png' });
+  check('no renderer errors', errors.length === 0);
+  await app.close(); app = null;
+  // Restore saved Ruby project, then reconnect to a fresh native session.
+  app = await launch(); const reopened = await app.firstWindow();
+  await reopened.getByTestId('engine-state').filter({ hasText: 'unavailable' }).waitFor();
+  check('Ruby project reopens with the right engine', await reopened.getByTestId('engine-select').inputValue() === 'sonic-pi');
+  await reopened.locator('.cm-content').press('Control+Enter');
+  await reopened.getByTestId('engine-state').filter({ hasText: 'playing' }).waitFor({ timeout: 60000 });
+  check('reopening reconnects a fresh native session', (await reopened.getByTestId('engine-state').innerText()).includes('playing'));
+  await reopened.locator('.cm-content').press('Control+.');
+  console.log(`${passed}/${passed} Sonic Pi desktop checks passed; listening remains manual`);
+} finally { if (app) await app.close(); console.log(`Isolated test profile: ${profile}`); }

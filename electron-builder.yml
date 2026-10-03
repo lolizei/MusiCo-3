@@ -1,0 +1,22 @@
+appId: io.github.lolizei.musico3
+productName: MusiCo-3
+directories:
+  output: release
+files:
+  - dist/**
+  - desktop/**
+  - package.json
+  - '!node_modules/**'
+extraResources:
+  - LICENSE
+  - docs/DESKTOP.md
+  - docs/CUSTOMIZING.md
+asar: true
+npmRebuild: false
+electronDist: node_modules/electron/dist
+win:
+  target:
+    - target: zip
+      arch: [x64]
+  signAndEditExecutable: false
+  artifactName: MusiCo-3-${version}-app-windows-x64.zip

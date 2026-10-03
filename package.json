@@ -1,10 +1,18 @@
 {
   "name": "beat-exe",
   "private": true,
-  "version": "0.1.0",
-  "description": "BEAT.EXE \u2014 a cute hacker-terminal live coding music editor powered by Strudel",
+  "version": "0.1.1",
+  "description": "BEAT.EXE — a cute hacker-terminal live coding music editor powered by Strudel",
   "type": "module",
+  "main": "desktop/main.mjs",
+  "author": "lolizei",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "license": "AGPL-3.0-or-later",
+  "overrides": {
+    "@electron/get": "5.1.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -13,13 +21,21 @@
     "test": "tsx --test tests/unit/*.test.ts",
     "test:smoke": "npm run build && node tests/smoke/build.mjs && node tests/smoke/smoke.mjs && node tests/smoke/real.mjs",
     "test:audio": "npm run build && node tests/smoke/audio.mjs",
-    "test:endurance": "npm run build && node tests/smoke/endurance.mjs"
+    "test:beginner": "npm run build && node --import tsx tests/smoke/beginner.mjs",
+    "test:sonic-pi": "node --import tsx tests/smoke/sonic-pi.mjs",
+    "test:endurance": "npm run build && node tests/smoke/endurance.mjs",
+    "desktop": "npm run build && electron .",
+    "desktop:build": "npm run build && electron-builder --win zip --x64",
+    "test:desktop": "node tests/smoke/desktop.mjs",
+    "desktop:share": "npm run desktop:build && node scripts/desktop-release.mjs",
+    "test:distribution": "node tests/smoke/distribution.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.0",
     "@codemirror/commands": "^6.11.1",
     "@codemirror/lang-javascript": "^6.2.2",
     "@codemirror/language": "^6.10.0",
+    "@codemirror/legacy-modes": "^6.5.4",
     "@codemirror/state": "^6.4.1",
     "@codemirror/view": "^6.34.0",
     "@lezer/highlight": "^1.2.0",
@@ -34,6 +50,8 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.0",
+    "electron": "44.5.1",
+    "electron-builder": "26.15.3",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vite": "^6.0.0"

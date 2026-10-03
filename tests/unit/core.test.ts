@@ -17,6 +17,7 @@ import { toDiagnostic, isEffectivelyEmpty } from '../../src/engines/diagnostics'
 import { STRUDEL_NAMES } from '../../src/engines/strudel/functions';
 import { ENGINES, getEngineDescriptor, getEngineInstance } from '../../src/engines/registry';
 import { SNIPPETS, TUTORIAL } from '../../src/tutorials/content';
+import { MELODY_STARTERS, melodyCode } from '../../src/tutorials/musicData';
 
 function makeStore() {
   let t = 1000;
@@ -247,6 +248,7 @@ describe('examples, tutorial and snippets', () => {
   const allCode = [
     ...EXAMPLES.map((e) => ({ name: e.id, code: e.code })),
     ...TUTORIAL.filter((t) => t.code).map((t) => ({ name: t.title, code: t.code! })),
+    ...MELODY_STARTERS.map(m => ({ name: m.title, code: melodyCode(m.notes) })),
     { name: 'template', code: NEW_PROJECT_TEMPLATE },
   ];
 
@@ -262,6 +264,7 @@ describe('examples, tutorial and snippets', () => {
 
   test('snippets use known functions', () => {
     for (const s of SNIPPETS) {
+      assert.doesNotThrow(() => new Function(s.code.startsWith('.') ? `note("c4").s("sine")${s.code}` : s.code), s.label);
       const used = [...s.code.replace(/"[^"]*"/g, '""').matchAll(/([A-Za-z_]\w*)\s*\(/g)].map((m) => m[1]);
       for (const fn of used) assert.ok(STRUDEL_NAMES.includes(fn) || fn === 'x', `${s.label} uses "${fn}"`);
     }

@@ -11,6 +11,7 @@ export interface CodeEditorHandle {
 
 export interface CodeEditorProps {
   initialCode: string;
+  language?: 'javascript' | 'ruby';
   onChange(code: string): void;
   onRun(): void;
   onStop(): void;

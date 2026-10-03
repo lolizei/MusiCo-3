@@ -1,5 +1,8 @@
 import type { EngineDescriptor, MusicEngine } from './types';
 import { StrudelEngine } from './strudel/StrudelEngine';
+import { SonicPiEngine } from './sonic-pi/SonicPiEngine';
+
+const sonicPi = typeof window !== 'undefined' ? window.sonicPi : undefined;
 
 export const DEFAULT_ENGINE_ID = 'strudel';
 
@@ -16,12 +19,12 @@ export const ENGINES: EngineDescriptor[] = [
   {
     id: 'sonic-pi',
     name: 'Sonic Pi',
-    description: 'Ruby-based live coding. Needs Sonic Pi running locally plus a bridge.',
-    language: 'javascript',
-    capabilities: { run: false, stop: false, liveUpdate: false, visualization: false },
-    available: false,
-    unavailableReason:
-      'Not implemented yet. Sonic Pi cannot run inside a browser; it needs a local bridge (planned for phase 4).',
+    description: 'Ruby live coding with a separate Sonic Pi 5.0.0 installation. Windows desktop only.',
+    language: 'ruby',
+    capabilities: { run: !!sonicPi, stop: !!sonicPi, liveUpdate: false, visualization: false },
+    available: !!sonicPi,
+    unavailableReason: sonicPi ? undefined : 'Sonic Pi requires the Windows desktop app and a separate Sonic Pi 5.0.0 installation.',
+    create: sonicPi ? () => new SonicPiEngine(sonicPi) : undefined,
   },
 ];
 

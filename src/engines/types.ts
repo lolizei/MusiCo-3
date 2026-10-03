@@ -53,7 +53,7 @@ export interface EngineDescriptor {
   name: string;
   description: string;
   /** Editor language mode for this engine's code. */
-  language: 'javascript';
+  language: 'javascript' | 'ruby';
   capabilities: EngineCapabilities;
   available: boolean;
   unavailableReason?: string;

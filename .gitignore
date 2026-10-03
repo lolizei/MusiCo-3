@@ -7,3 +7,5 @@ tests/smoke/*.png
 .env.*
 !.env.example
 *.log
+release/
+/.local-tools/
