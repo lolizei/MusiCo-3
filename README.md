@@ -1,4 +1,4 @@
-# MusiCo-3 — BEAT.EXE ♡
+# MusiCo:3 — BEAT.EXE ♡
 
 A beginner-friendly live coding music studio with a retro terminal look, powered
 by Strudel. Write a pattern, press RUN, and change the music while it plays.
