@@ -27,9 +27,10 @@ const run = async text => {
 const stop = async () => { await page.getByTestId('btn-stop').click(); await state.filter({ hasText: 'ready' }).waitFor(); };
 const visibleCat = () => page.locator('.cat-frame').evaluateAll(frames => frames.filter(f => getComputedStyle(f).visibility === 'visible').map(f => f.textContent));
 try {
+  // Master output connects during app initialization; install the probe first.
+  await page.addInitScript(installOutputMeter);
   await page.goto('http://127.0.0.1:4177/');
   await state.filter({ hasText: 'ready' }).waitFor({ timeout: 60000 });
-  await page.evaluate(installOutputMeter);
   await command('set animations on');
   check('guide cat animates when enabled', await page.locator('.cat-frame').first().evaluate(el => getComputedStyle(el).animationName === 'cat-blink'));
   const first = await visibleCat(); await page.waitForTimeout(1500);

@@ -1,0 +1,42 @@
+// WINDOWLIGHT - original lo-fi background music
+// 74 BPM, warm chords, soft drums, little late-night notes.
+// All instruments are synthesized: no sample downloads needed.
+// RUN plays continuously. STOP ends playback. Import the .beat.json to edit.
+// Softer under speech? Lower the gain values. Slower? Change 74 to 68.
+
+setcpm(74/4)
+
+// Warm keys: Dmaj7 -> Bm7 -> Em9 -> A6. Each chord lasts two bars.
+$: note("<[d3,fs3,a3,cs4] [b2,d3,fs3,a3] [e3,g3,b3,fs4] [a2,cs3,e3,fs3]>")
+  .slow(2)
+  .struct("x ~ ~ x ~ ~ x ~")
+  .s("triangle")
+  .attack(0.015).decay(0.32).sustain(0.25).release(0.45)
+  .lpf(1800).room(0.22).gain(0.055)
+
+// A round bass, with a quiet pickup into the next chord.
+$: note("<[d2 ~ ~ ~ a1 ~ cs2 ~] [b1 ~ ~ ~ fs2 ~ a1 ~] [e2 ~ ~ ~ b1 ~ d2 ~] [a1 ~ ~ ~ e2 ~ cs2 ~]>")
+  .slow(2).s("sine")
+  .attack(0.012).decay(0.18).sustain(0.35).release(0.12)
+  .gain(0.20)
+
+// A small original melody; rests leave space for a voice-over.
+$: note("<[~ fs4 ~ a4 ~ e4 ~ cs4] [~ d4 ~ fs4 ~ a4 ~ ~] [~ b4 ~ g4 ~ fs4 ~ e4] [~ cs4 ~ e4 ~ b3 ~ ~]>")
+  .slow(2).s("triangle")
+  .attack(0.01).decay(0.25).sustain(0.1).release(0.35)
+  .lpf(2400).room(0.28).gain(0.10)
+
+// Soft synthesized kick. No drum recording or sample pack.
+$: note("c1 ~ ~ ~ c1 ~ c1 ~").s("sine")
+  .attack(0.002).decay(0.10).sustain(0).release(0.06)
+  .gain(0.30)
+
+// A brushed noise snare on beats two and four, slightly behind the grid.
+$: s("~ white ~ white")
+  .attack(0.002).decay(0.08).sustain(0).release(0.045)
+  .hpf(1400).lpf(5500).late(0.012).gain(0.09)
+
+// Quiet hats: every other hit arrives a little late for a gentle swing.
+$: s("white*8").late("0 0.035")
+  .attack(0.001).decay(0.025).sustain(0).release(0.018)
+  .hpf(6500).lpf(11000).gain("0.028 0.017")

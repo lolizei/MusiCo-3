@@ -1,5 +1,5 @@
 import type { EngineDiagnostic } from './types';
-import { isResourceFailure } from './diagnostics';
+import { isResourceFailure, isAudioFailure } from './diagnostics';
 
 export interface Explanation {
   headline: string;
@@ -16,6 +16,16 @@ export function explainError(diag: EngineDiagnostic, knownNames: string[]): Expl
   const msg = diag.message;
   const where = diag.line ? `around line ${diag.line}` : 'in your code';
   const base = { line: diag.line, technical: msg };
+
+  if (diag.kind === 'audio' || isAudioFailure(msg)) return {
+    ...base,
+    headline: 'An audio processor could not start.',
+    details: [
+      'Playback stopped because an audio effect is unavailable. This is not a bracket or function-name error.',
+      'Save or export your code, then restart the app or reload the page to retry.',
+      'For the shape-processor error, remove .shape(...) as a temporary workaround. Other effects may need different processors.',
+    ],
+  };
 
   if (diag.kind === 'resource' || isResourceFailure(msg)) {
     return {
@@ -64,7 +74,8 @@ export function explainError(diag: EngineDiagnostic, knownNames: string[]): Expl
       headline: name ? `The sound "${name}" isn't loaded.` : "A sound isn't loaded.",
       details: [
         'Playback stopped. Check the sound name and sample source before running again.',
-        'Built-in synths: sine, square, triangle, sawtooth.',
+        'Built-in synths: sine, square, triangle, sawtooth. Piano is bundled for offline use.',
+        'Other banks need their sample map: open SAMPLES and add a loader above your song.',
         'Drum samples (bd, sd, hh, cp…) download from the internet the first time.',
       ],
     };

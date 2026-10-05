@@ -1,12 +1,15 @@
-import type { EngineListener, EngineState, MusicEngine, RunResult, EngineDiagnostic } from '../types';
+import type { EngineListener, EngineState, MusicEngine, RunResult, EngineDiagnostic, EngineAudioOutput } from '../types';
 import { isEffectivelyEmpty, toDiagnostic } from '../diagnostics';
+import { pianoSnapshot, type PianoSnapshot } from '../../editor/piano/events';
+import { triggeredNotes, type LiveNote, type LivePianoFrame } from '../../editor/piano/live';
 
 /**
  * The parts of the official `@strudel/web` package this adapter relies on.
  * Optional members are used only if the installed version provides them.
  */
 export type StrudelWeb = Pick<typeof import('@strudel/web'),
-  'initStrudel' | 'evaluate' | 'hush' | 'samples' | 'getAudioContext' | 'initAudio'>;
+  'initStrudel' | 'evaluate' | 'hush' | 'samples' | 'getAudioContext' | 'initAudio' | 'loadWorklets'> &
+  Partial<Pick<typeof import('@strudel/web'), 'getSuperdoughAudioController'>>;
 
 /** Classic TidalCycles drum/sample set, as used in Strudel's own docs. Needs network on first use. */
 export const DEFAULT_SAMPLE_SOURCE = 'github:tidalcycles/dirt-samples';
@@ -32,7 +35,39 @@ export class StrudelEngine implements MusicEngine {
   private runChain: Promise<unknown> = Promise.resolve();
   private state: EngineState = 'offline';
   private playing = false;
+  private notes: PianoSnapshot | null = null;
+  private liveNotes: LiveNote[] = [];
+
+  getLivePianoFrame(): LivePianoFrame | null {
+    if (!this.playing || !this.mod) return null;
+    const context = this.mod.getAudioContext();
+    if (context.state !== 'running' || !Number.isFinite(context.currentTime)) return null;
+    for (let i = this.liveNotes.length - 1; i >= 0; i--) {
+      if (this.liveNotes[i].end <= context.currentTime - 0.1) this.liveNotes.splice(i, 1);
+    }
+    return { time: context.currentTime, notes: this.liveNotes.slice() };
+  }
+
+  private observePattern = (pattern: unknown): unknown => {
+    if (typeof pattern !== 'object' || !pattern || !('onTrigger' in pattern) || typeof pattern.onTrigger !== 'function') return pattern;
+    // A new pattern gets a separate buffer; callbacks from an old evaluation
+    // cannot contaminate it. Failed evaluation leaves the old pattern intact.
+    const buffer: LiveNote[] = [];
+    this.liveNotes = buffer;
+    const generation = this.stopGeneration;
+    return pattern.onTrigger((hap: unknown, _now: number, cps: number, target: number) => {
+      try {
+        if (generation !== this.stopGeneration) return;
+        const notes = triggeredNotes(hap, cps, target);
+        buffer.push(...notes);
+        if (buffer.length > 512) buffer.splice(0, buffer.length - 512);
+      } catch { /* Visuals must never interrupt output. */ }
+    }, false); // non-dominant: retains default audio and existing user triggers
+  };
+
+  getPianoSnapshot(): PianoSnapshot | null { return this.notes; }
   private audioPromise: Promise<void> | null = null;
+  private audioContext: AudioContext | null = null;
   private stopGeneration = 0;
   private resourceFailed = false;
 
@@ -55,6 +90,11 @@ export class StrudelEngine implements MusicEngine {
     return this.playing;
   }
 
+  getAudioOutput(): EngineAudioOutput | null {
+    const node = this.mod?.getSuperdoughAudioController?.().output.destinationGain;
+    return node && this.mod ? { context: this.mod.getAudioContext(), node } : null;
+  }
+
   init(): Promise<void> {
     if (!this.initPromise) {
       this.initPromise = this.doInit().catch((err) => {
@@ -73,7 +113,15 @@ export class StrudelEngine implements MusicEngine {
         document.addEventListener('strudel.log', this.onStrudelLog as EventListener);
       }
       await mod.initStrudel({
+        editPattern: this.observePattern,
         prebake: async () => {
+          try {
+            const base = typeof document !== 'undefined' && document.baseURI ? document.baseURI : 'http://localhost/';
+            await mod.samples(new URL('./samples/piano/strudel.json', base).href, new URL('./samples/piano/', base).href);
+            this.listener?.log('info', 'offline piano ready: Salamander Grand Piano V3 · Alexander Holm · CC BY 3.0');
+          } catch (err) {
+            this.listener?.log('warn', 'Bundled piano unavailable: ' + toDiagnostic(err).message);
+          }
           try {
             await mod.samples(DEFAULT_SAMPLE_SOURCE);
             this.listener?.log('info', 'drum sample list loaded (each sound downloads on first use)');
@@ -123,17 +171,27 @@ export class StrudelEngine implements MusicEngine {
       if (ctx.state !== 'running') await ctx.resume();
       // Upstream only initialises effects on mousedown. Explicit initialisation
       // also covers a keyboard-only first RUN, and waits for the worklets.
-      this.audioPromise ??= mod.initAudio().catch((err) => { this.audioPromise = null; throw err; });
+      if (ctx !== this.audioContext) { this.audioPromise = null; this.audioContext = ctx; }
+      this.audioPromise ??= (async () => {
+        // initAudio catches and only warns about worklet load failures. Await
+        // the exported loader directly so a failed load cannot claim readiness.
+        await mod.loadWorklets();
+        await mod.initAudio();
+      })().catch((err) => { this.audioPromise = null; throw err; });
       await this.audioPromise;
     } catch (err) {
-      return { ok: false, error: toDiagnostic(err) };
+      if (generation !== this.stopGeneration) return { ok: false, error: { message: 'run cancelled by STOP' } };
+      const error: EngineDiagnostic = { ...toDiagnostic(err), kind: 'audio' };
+      this.blockOnResourceFailure(error, false);
+      return { ok: false, error };
     }
 
     if (generation !== this.stopGeneration) return { ok: false, error: { message: 'run cancelled by STOP' } };
 
     this.capture = { error: null };
+    let evaluated: unknown;
     try {
-      await mod.evaluate(code, true);
+      evaluated = await mod.evaluate(code, true);
     } catch (err) {
       // Some Strudel versions throw instead of calling onEvalError
       this.capture.error ??= toDiagnostic(err);
@@ -156,12 +214,14 @@ export class StrudelEngine implements MusicEngine {
       return { ok: false, error };
     }
     this.playing = true;
+    this.notes = pianoSnapshot(evaluated);
     this.setState('playing');
     return { ok: true };
   }
 
   stop(): void {
     this.stopGeneration++;
+    this.liveNotes = [];
     if (!this.mod) return;
     try {
       this.mod.hush();

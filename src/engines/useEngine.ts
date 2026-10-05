@@ -60,6 +60,11 @@ export function useEngine(engineId: string, sink: EngineSink) {
 
   const stop = useCallback(() => engine?.stop(), [engine]);
   const isPlaying = useCallback(() => engine?.isPlaying() ?? false, [engine]);
+  const getAudioOutput = useCallback(() => {
+    try { return engine?.getAudioOutput?.() ?? null; } catch { return null; }
+  }, [engine]);
+  const getPianoSnapshot = useCallback(() => engine?.getPianoSnapshot?.() ?? null, [engine]);
+  const getLivePianoFrame = useCallback(() => engine?.getLivePianoFrame?.() ?? null, [engine]);
 
-  return { descriptor, state, run, stop, isPlaying, available: !!engine };
+  return { descriptor, state, run, stop, isPlaying, getAudioOutput, getPianoSnapshot, getLivePianoFrame, available: !!engine };
 }

@@ -11,6 +11,8 @@ extraResources:
   - LICENSE
   - docs/DESKTOP.md
   - docs/CUSTOMIZING.md
+  - docs/SAMPLE_LICENSES.md
+  - docs/AUDIO_EXPORT_LICENSES.md
 asar: true
 npmRebuild: false
 electronDist: node_modules/electron/dist

@@ -186,6 +186,15 @@ describe('terminal commands', () => {
     assert.ok(out.some((l) => l.includes('did you mean "stop"')));
   });
 
+  test('cmd, copy and piano roll aliases dispatch app actions', () => {
+    const { c, called, out } = ctx();
+    executeCommand('cmd', c); executeCommand('copycode', c); executeCommand('roll', c);
+    assert.deepEqual(called, ['help()', 'copyCode()', 'pianoRoll()']);
+    assert.ok(out.some(line => line.includes('pianoroll')));
+    const data = { themes: [], examples: [], projects: [], engines: [] };
+    assert.deepEqual(completeCommandLine('cm', data), ['cmd']);
+  });
+
   test('music code typed in the terminal is redirected to the editor', () => {
     const { c, out } = ctx();
     executeCommand('$: s("bd")', c);
@@ -205,7 +214,7 @@ describe('terminal commands', () => {
 
   test('tab completion for commands and arguments', () => {
     const data = { themes: ['midnight', 'matrix', 'amber'], examples: ['first-beat', 'full-track'], projects: ['my song'], engines: ['strudel'] };
-    assert.deepEqual(completeCommandLine('sa', data), ['save', 'saveas']);
+    assert.deepEqual(completeCommandLine('sa', data), ['samples', 'save', 'saveas']);
     assert.deepEqual(completeCommandLine('theme m', data), ['midnight', 'matrix']);
     assert.deepEqual(completeCommandLine('load ', data), ['first-beat', 'full-track']);
     assert.equal(applyCompletion('open m', 'my song'), 'open "my song" ');

@@ -10,7 +10,12 @@ const executablePath=path.resolve(process.argv[2] ?? 'release/win-unpacked/MusiC
 let app;
 let passed=0;
 const check=(name,ok)=>{assert.ok(ok,name);console.log(`PASS desktop: ${name}`);passed++;};
-const launch=()=>electron.launch({executablePath, env:{...process.env,BEAT_TEST_USER_DATA:profile}});
+const launch=async()=>{
+  const testApp=await electron.launch({executablePath, env:{...process.env,BEAT_TEST_USER_DATA:profile}});
+  // Only this isolated test window: prevent desktop input from altering assertions.
+  await testApp.evaluate(({BrowserWindow})=>{for(const window of BrowserWindow.getAllWindows())window.hide();});
+  return testApp;
+};
 const boot=async()=>{
   app=await launch();const page=await app.firstWindow();
   await page.getByTestId('engine-state').filter({hasText:'ready'}).waitFor({timeout:60000});
@@ -24,9 +29,13 @@ try {
   check('sandbox and isolation enabled',await app.evaluate(({BrowserWindow})=>{const p=BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences();return p.sandbox && p.contextIsolation && !p.nodeIntegration && p.webSecurity;}));
   const response=await page.evaluate(async()=>{const r=await fetch('beat://app/%2e%2e%2fpackage.json');return r.status;});
   check('protocol blocks paths outside bundled assets',response===403);
-  await page.evaluate(installOutputMeter);
+  // The master controls create the final gain node during initialization.
+  // Install the probe before that connection is made, using a clean reload.
+  await page.addInitScript(installOutputMeter);
+  await page.reload();
+  await page.getByTestId('engine-state').filter({hasText:'ready'}).waitFor({timeout:60000});
   const content=page.locator('.cm-content');const state=page.getByTestId('engine-state');
-  await content.press('Control+a');await page.keyboard.insertText('$: note("c3 e3 g3").s("sine").gain(0.3)');
+  await content.press('Control+a');await page.keyboard.insertText('$: note("c3 e3 g3").s("sine").shape(0.45).gain(0.3)');
   await content.press('Control+Enter');await state.filter({hasText:'playing'}).waitFor();
   await page.waitForFunction(()=>window.__levels.nonzero>0,{},{timeout:30000});
   check('real synth and worklets produce output in packaged app',await page.evaluate(()=>window.__levels.nonzero>0 && window.__levels.peak>0));
@@ -57,7 +66,7 @@ try {
   await app.close();app=null;
   console.log(`${passed}/${passed} packaged desktop checks passed (listening remains manual)`);
 } finally {
-  if(app) await app.close();
+  if(app) { await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().forEach(window=>window.destroy())); await app.close(); }
   // Verify the generated temporary directory before recursive cleanup.
   assert.equal(path.dirname(profile),path.resolve(os.tmpdir()));
   assert.ok(path.basename(profile).startsWith('musico-desktop-'));

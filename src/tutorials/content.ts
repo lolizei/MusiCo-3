@@ -10,7 +10,7 @@ export const TUTORIAL: TutorialStep[] = [
     title: 'Make a sound',
     text: [
       'Every line that starts with $: is a layer of music.',
-      's("bd") plays a bass drum. Press "Try it", then ctrl+enter.',
+      's("bd") plays a bass drum. Press "Try it", then RUN.',
     ],
     code: `setcpm(120/4)\n\n$: s("bd")\n`,
   },
@@ -18,7 +18,7 @@ export const TUTORIAL: TutorialStep[] = [
     title: 'Make a beat',
     text: [
       'Put several sounds in the quotes. They share one cycle (one bar).',
-      'While it plays, change sd to cp and press ctrl+enter again. The music keeps going.',
+      'While it plays, change sd to cp and press RUN again. The music keeps going.',
     ],
     code: `setcpm(120/4)\n\n$: s("bd sd bd sd")\n`,
   },
@@ -41,7 +41,7 @@ export const TUTORIAL: TutorialStep[] = [
     title: 'Build a track',
     text: [
       'Combine it all. Mute a layer by putting // in front of its $: line.',
-      'Press ctrl+. to stop and ctrl+s to save your song. Have fun ♡',
+      'Press STOP to stop and SAVE to save your song. Have fun ♡',
     ],
     code: `setcpm(120/4)\n\n$: s("bd*4")\n$: s("~ sd ~ sd")\n$: s("hh*8").gain(0.4)\n$: note("c2 c2 eb2 g1").s("sawtooth").lpf(600).gain(0.7)\n$: n("0 2 4 <7 6>").scale("C:minor").s("triangle").room(0.4).gain(0.5)\n`,
   },

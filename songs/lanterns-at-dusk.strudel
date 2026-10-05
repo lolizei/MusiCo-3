@@ -1,0 +1,44 @@
+// LANTERNS AT DUSK - an original quiet-world ambient loop
+// Soft bells, warm chords, and plenty of space. No downloaded samples.
+// Ctrl+Enter / RUN to play. Ctrl+. / STOP to stop.
+// Each chord lasts two cycles; the whole phrase lasts about 27 seconds.
+// Customize: change 72 for tempo, or lower a layer's gain to make it quieter.
+
+setcpm(72/4)
+
+// Little lanterns: a sparse, original bell melody.
+$: note("<[e5 ~ g5 d5 ~ b4 ~ g4] [a4 ~ c5 e5 ~ b4 ~ e4] [a4 ~ g4 c5 ~ e5 ~ c5] [d5 ~ b4 a4 ~ g4 ~ d5]>")
+  .slow(2)
+  .s("sine")
+  .attack(0.01)
+  .release(0.8)
+  .room(0.35)
+  .gain(0.17)
+
+// A soft blanket: Cmaj7, Am7, Fmaj7, then a suspended G chord.
+// Commas play notes together. Angle brackets change the chord each cycle.
+$: note("<[c4,e4,g4,b4] [a3,c4,e4,g4] [f3,a3,c4,e4] [g3,c4,d4,a4]>")
+  .slow(2)
+  .s("triangle")
+  .attack(1)
+  .release(2)
+  .lpf(1200)
+  .room(0.45)
+  .gain(0.035)
+
+// Quiet footsteps: one low note underneath each chord.
+$: note("<c2 a1 f2 g2>")
+  .slow(2)
+  .s("sine")
+  .attack(0.2)
+  .release(1)
+  .gain(0.13)
+
+// Stars: occasional high notes. The ~ symbols leave silence.
+$: note("<~ [~ ~ e6 ~] ~ [~ d6 ~ ~]>")
+  .slow(2)
+  .s("sine")
+  .attack(0.01)
+  .release(1.2)
+  .room(0.45)
+  .gain(0.035)

@@ -3,7 +3,7 @@ import { COMMANDS } from '../terminal/commands';
 export type PaletteTarget =
   | { kind: 'command'; command: string; prepare?: boolean }
   | { kind: 'project'; id: string; operation: 'open' | 'delete' }
-  | { kind: 'action'; action: 'focus-terminal' | 'help' | 'toggle-help' | 'toggle-mode' };
+  | { kind: 'action'; action: 'focus-terminal' | 'help' | 'toggle-help' | 'toggle-mode' | 'settings' };
 
 export interface PaletteEntry {
   id: string;
@@ -36,6 +36,7 @@ export function buildPaletteEntries(data: PaletteData): PaletteEntry[] {
     target: { kind: 'command', command: command.name, prepare: ['delete', 'set'].includes(command.name) },
   }));
   entries.push(
+    { id: 'action:settings', label: 'Settings', detail: 'Customize appearance, learning mode and keyboard shortcuts', target: { kind: 'action', action: 'settings' } },
     { id: 'action:terminal', label: 'Focus terminal', detail: 'Type a terminal command', target: { kind: 'action', action: 'focus-terminal' } },
     { id: 'action:help', label: 'Show help', detail: 'Open the beginner guide and command list', target: { kind: 'action', action: 'help' } },
     { id: 'action:toggle-help', label: 'Toggle help panel', detail: 'Show or hide the side panel', target: { kind: 'action', action: 'toggle-help' } },

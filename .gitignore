@@ -1,6 +1,7 @@
 node_modules/
 dist/
 tests/smoke/dist/
+tests/smoke/extension-dist/
 tests/smoke/artifacts/
 tests/smoke/*.png
 .env

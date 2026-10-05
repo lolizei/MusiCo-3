@@ -3,6 +3,7 @@ import type { EngineState } from '../engines/types';
 import type { EngineDescriptor } from '../engines/types';
 import { ENGINES } from '../engines/registry';
 import { PLAY_FRAMES } from './ascii';
+import { shortcutLabel, type Shortcuts } from '../settings/shortcuts';
 
 interface TitleBarProps {
   projectName: string;
@@ -71,38 +72,50 @@ interface ToolbarProps {
   onExamples(): void;
   onHelp(): void;
   onPalette(): void;
+  onSettings(): void;
+  onCopy(): void;
+  onPianoRoll(): void;
+  onSamples(): void;
+  samplesEnabled: boolean;
+  shortcuts: Shortcuts;
+  liveUpdate: boolean;
 }
 
 export function Toolbar(p: ToolbarProps) {
-  const runTitle = p.canRun ? (p.playing ? 'Update the music without stopping (Ctrl+Enter)' : 'Play your code (Ctrl+Enter)') : p.disabledReason;
+  const key = (action: keyof Shortcuts) => shortcutLabel(p.shortcuts[action]);
+  const runTitle = p.canRun ? `${p.playing ? p.liveUpdate ? 'Update the music without stopping' : 'Replace the music (brief gap)' : 'Play your code'} (${key('run')})` : p.disabledReason;
   return (
     <nav className="toolbar" aria-label="Main actions">
       <button className="tbtn tbtn-primary" onClick={p.onRun} disabled={!p.canRun} title={runTitle} data-testid="btn-run">
         [▶ {p.playing ? 'UPDATE' : 'RUN'}]
       </button>
-      <button className="tbtn" onClick={p.onStop} disabled={!p.canRun || !p.playing} title="Stop all sound (Ctrl+.)" data-testid="btn-stop">
+      <button className="tbtn" onClick={p.onStop} disabled={!p.canRun || !p.playing} title={`Stop music (${key('stop')})`} data-testid="btn-stop">
         [■ STOP]
       </button>
       <button className="tbtn" onClick={p.onRestart} disabled={!p.canRun} title="Stop, then play from the start" data-testid="btn-restart">
         [↻ RESTART]
       </button>
       <span className="toolbar-gap" aria-hidden="true" />
-      <button className="tbtn" onClick={p.onSave} title="Save project (Ctrl+S)" data-testid="btn-save">
+      <button className="tbtn" onClick={p.onSave} title={`Save project (${key('save')})`} data-testid="btn-save">
         [♡ SAVE]
       </button>
-      <button className="tbtn" onClick={p.onOpen} title="Open a saved project (Ctrl+O)" data-testid="btn-open">
+      <button className="tbtn" onClick={p.onOpen} title={`Open a saved project (${key('open')})`} data-testid="btn-open">
         [OPEN]
       </button>
-      <button className="tbtn" onClick={p.onNew} title="New project (Alt+N)" data-testid="btn-new">
+      <button className="tbtn" onClick={p.onNew} title={`New project tab (${key('newProject')})`} data-testid="btn-new">
         [NEW]
       </button>
       <button className="tbtn" onClick={p.onExamples} title="Load a working example song" data-testid="btn-examples">
         [EXAMPLES]
       </button>
-      <button className="tbtn" onClick={p.onPalette} title="Command palette (Ctrl+Shift+P)" data-testid="btn-palette">
+      <button className="tbtn" onClick={p.onPalette} title={`Command palette (${key('openPalette')})`} data-testid="btn-palette">
         [COMMANDS]
       </button>
-      <button className="tbtn" onClick={p.onHelp} title="Help (F1)">
+      <button className="tbtn" onClick={p.onSettings} title={`Customize (${key('settings')})`} data-testid="btn-settings">[SETTINGS]</button>
+      <button className="tbtn" onClick={p.onCopy} title="Copy the current editor code" data-testid="btn-copy">[COPY CODE]</button>
+      <button className="tbtn" onClick={p.onPianoRoll} title="Build a Strudel melody and drum pattern" data-testid="btn-pianoroll">[PIANO ROLL]</button>
+      <button className="tbtn" onClick={p.onSamples} disabled={!p.samplesEnabled} title="Manage Strudel sample sources" data-testid="btn-samples">[SAMPLES]</button>
+      <button className="tbtn" onClick={p.onHelp} title={`Help (${key('help')})`}>
         [? HELP]
       </button>
     </nav>

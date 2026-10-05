@@ -20,7 +20,7 @@ export interface EngineCapabilities {
 
 export interface EngineDiagnostic {
   message: string;
-  kind?: 'resource' | 'sound';
+  kind?: 'resource' | 'sound' | 'audio';
   /** 1-based line in the user's code, when the engine reports one. */
   line?: number;
   column?: number;
@@ -38,6 +38,11 @@ export interface EngineListener {
 }
 
 export interface MusicEngine {
+  /** Optional bounded view of notes in the last successful evaluated pattern. */
+  getPianoSnapshot?(): import('../editor/piano/events').PianoSnapshot | null;
+  getLivePianoFrame?(): import('../editor/piano/live').LivePianoFrame | null;
+  /** Actual final browser audio output, when supported; never synthesized meter data. */
+  getAudioOutput?(): EngineAudioOutput | null;
   readonly id: string;
   setListener(listener: EngineListener | null): void;
   /** Idempotent: calling it repeatedly never creates a second audio engine. */
@@ -48,7 +53,11 @@ export interface MusicEngine {
   getState(): EngineState;
 }
 
+export interface EngineAudioOutput { context: AudioContext; node: GainNode }
+
 export interface EngineDescriptor {
+  /** Used by NEW and the engine selector; omitted means an empty project. */
+  starterCode?: string;
   id: string;
   name: string;
   description: string;

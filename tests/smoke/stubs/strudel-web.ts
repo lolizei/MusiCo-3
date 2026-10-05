@@ -19,5 +19,7 @@ export async function evaluate(code: string) {
   }
 }
 export function hush() { calls.hush++; }
-export function getAudioContext() { return { state: 'running', resume: async () => {} }; }
+const audioContext = { state: 'running', resume: async () => {} };
+export function getAudioContext() { return audioContext; }
 export async function initAudio() {}
+export async function loadWorklets() {}

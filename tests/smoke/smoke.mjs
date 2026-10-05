@@ -51,7 +51,7 @@ try {
   await settle();
   check('boot banner and READY message', (await log()).includes('SYSTEM BOOT COMPLETE') && (await state()).includes('ready'));
   check('Strudel initialised exactly once (StrictMode double mount)', (await calls()).initStrudel === 1);
-  check('drum samples requested', (await calls()).samples[0] === 'github:tidalcycles/dirt-samples');
+  check('drum samples requested', (await calls()).samples.includes('github:tidalcycles/dirt-samples'));
   check('Sonic Pi listed but disabled', await page.locator('option[value=sonic-pi]').evaluate((o) => o.disabled));
 
   // ---- load an example (beginner path)
@@ -139,10 +139,10 @@ try {
   await settle();
   check('editing shows unsaved marker', (await page.getByTestId('dirty-marker').count()) === 1);
   await page.getByTestId('btn-new').click();
-  check('NEW with unsaved changes asks first', (await page.getByTestId('dialog').innerText()).includes('not saved'));
-  await page.keyboard.press('Escape');
+  check('NEW keeps unsaved work in another tab', (await page.getByRole('tab', {name:/my first song/}).count()) === 1 && (await page.getByTestId('dialog').count()) === 0);
+  await page.getByRole('tab', {name:/my first song/}).click();
   await settle();
-  check('Escape cancels and keeps the code', (await page.getByTestId('dialog').count()) === 0 && (await editor.inputValue()) === '$: s("cp*4")');
+  check('switching back retains the unsaved code', (await editor.inputValue()) === '$: s("cp*4")');
 
   // ---- crash/close recovery
   await page.waitForTimeout(800); // draft autosave delay
@@ -164,7 +164,7 @@ try {
   check('terminal: projects lists saved project', text.includes('my first song'));
   check('terminal: unknown command suggests', text.includes('did you mean "stop"'));
   check('terminal: music code redirected to editor', text.includes('looks like music code'));
-  await page.locator('[data-testid=terminal-input]').fill('sa');
+  await page.locator('[data-testid=terminal-input]').fill('sav');
   await page.locator('[data-testid=terminal-input]').press('Tab');
   check('terminal: tab completion', (await page.locator('[data-testid=terminal-input]').inputValue()) === 'save');
 

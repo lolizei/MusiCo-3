@@ -1,9 +1,11 @@
 /**
  * BEAT.EXE application commands. These are NOT shell commands: nothing here
- * can reach the operating system. Each command calls into a CommandContext
+ * runs a shell. Desktop quit only requests normal window closure. Each command calls into a CommandContext
  * that the app provides, which keeps this module pure and testable.
  */
 import { closestName } from '../engines/explain';
+import { SETTING_KEYS } from '../settings/settings';
+import { TERMINAL_ANIMATIONS, ANIMATION_SPEEDS } from './animations';
 
 export type LineKind = 'out' | 'ok' | 'info' | 'warn' | 'error' | 'echo' | 'art';
 
@@ -31,6 +33,11 @@ export interface CommandContext {
   describeSettings(): string[];
   tutorial(): void;
   help(): void;
+  customize(): void;
+  copyCode(): void;
+  pianoRoll(): void;
+  sampleManager(): void;
+  quit(): void;
 }
 
 export interface CommandDef {
@@ -44,7 +51,12 @@ export interface CommandDef {
 const rest = (args: string[]) => (args.length ? args.join(' ') : undefined);
 
 export const COMMANDS: CommandDef[] = [
-  { name: 'help', aliases: ['?'], usage: 'help', summary: 'list commands and shortcuts', run: (_a, c) => printHelp(c) },
+  { name: 'quit', aliases: ['exit'], usage: 'quit (or exit)', summary: 'close the desktop app (warns about unsaved work)', run: (_a, c) => c.quit() },
+  { name: 'samples', aliases: ['sounds'], usage: 'samples', summary: 'manage and share Strudel sample sources', run: (_a, c) => c.sampleManager() },
+  { name: 'customize', usage: 'customize', summary: 'open appearance and keyboard settings', run: (_a, c) => c.customize() },
+  { name: 'help', aliases: ['?', 'cmd'], usage: 'help (or cmd)', summary: 'list commands and shortcuts', run: (_a, c) => printHelp(c) },
+  { name: 'copy', aliases: ['copycode'], usage: 'copy', summary: 'copy the current editor code', run: (_a, c) => c.copyCode() },
+  { name: 'pianoroll', aliases: ['roll'], usage: 'pianoroll', summary: 'build notes and drums in a visual Strudel sketch', run: (_a, c) => c.pianoRoll() },
   { name: 'clear', aliases: ['cls'], usage: 'clear', summary: 'clear this terminal', run: (_a, c) => c.clear() },
   { name: 'play', aliases: ['run'], usage: 'play', summary: 'run the code in the editor', run: (_a, c) => c.run() },
   { name: 'stop', aliases: ['hush'], usage: 'stop', summary: 'stop all sound', run: (_a, c) => c.stop() },
@@ -119,7 +131,7 @@ export const COMMANDS: CommandDef[] = [
   {
     name: 'set',
     usage: 'set <setting> <value>',
-    summary: 'change a setting (fontsize, crt, animations, mode, theme)',
+    summary: 'change appearance (theme, mascot, mascotspeed, animations) and other settings',
     run: (a, c) => {
       if (a.length < 2) return c.print('usage: set <setting> <value>   e.g. set fontsize 18', 'warn');
       c.set(a[0], a.slice(1).join(' '));
@@ -138,7 +150,7 @@ function printHelp(c: CommandContext): void {
   c.help();
   for (const cmd of COMMANDS) c.print(`  ${cmd.usage.padEnd(24)} ${cmd.summary}`);
   c.print('');
-  c.print('keys: ctrl+enter run · ctrl+. stop · ctrl+s save · ctrl+o open · alt+n new · ctrl+shift+p palette · f1 help', 'info');
+  c.print('Use SETTINGS or customize to view and change your keyboard shortcuts.', 'info');
 }
 
 /** Splits a command line into words; "double quotes" keep spaces together. */
@@ -160,7 +172,7 @@ export function executeCommand(line: string, ctx: CommandContext): void {
   if (!cmd) {
     const guess = closestName(name, [...BY_NAME.keys()]);
     if (looksLikeMusicCode(trimmed)) {
-      ctx.print('that looks like music code. Type it in the editor above, then press ctrl+enter ♡', 'warn');
+      ctx.print('that looks like music code. Type it in the editor above, then press RUN ♡', 'warn');
     } else {
       ctx.print(`unknown command "${name}".${guess ? ` did you mean "${guess}"?` : ''} type help for the list.`, 'warn');
     }
@@ -189,10 +201,15 @@ export function completeCommandLine(input: string, data: CompletionData): string
   const endsWithSpace = /\s$/.test(input);
   const { name, args } = parseCommandLine(input);
   if (!endsWithSpace && args.length === 0) {
-    return COMMANDS.map((c) => c.name).filter((n) => n.startsWith(name)).sort();
+    return COMMANDS.flatMap(c => [c.name, ...(c.aliases ?? [])]).filter(n => n.startsWith(name)).sort();
   }
   const partial = endsWithSpace ? '' : (args[args.length - 1] ?? '').toLowerCase();
   const argIndex = endsWithSpace ? args.length : args.length - 1;
+  if (name === 'set' && argIndex === 1) {
+    const values = args[0] === 'mascot' ? TERMINAL_ANIMATIONS.map(item => item.id)
+      : args[0] === 'mascotspeed' ? Object.keys(ANIMATION_SPEEDS) : [];
+    return values.filter(value => value.startsWith(partial));
+  }
   if (argIndex !== 0) return [];
   const pool: Record<string, string[]> = {
     theme: data.themes,
@@ -201,7 +218,7 @@ export function completeCommandLine(input: string, data: CompletionData): string
     delete: data.projects,
     rm: data.projects,
     engine: data.engines,
-    set: ['fontsize', 'crt', 'animations', 'mode', 'theme'],
+    set: [...SETTING_KEYS],
   };
   return (pool[name] ?? []).filter((x) => x.toLowerCase().startsWith(partial));
 }

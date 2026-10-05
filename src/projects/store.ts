@@ -3,6 +3,8 @@
  * localStorage in the browser and an in-memory map in tests.
  */
 
+import { parseWorkspace, type WorkspaceSession } from './tabs';
+
 export const PROJECT_FORMAT_VERSION = 1;
 export const MAX_NAME_LENGTH = 60;
 
@@ -61,6 +63,8 @@ function defaultId(): string {
 }
 
 export class ProjectStore {
+  private corruptWorkspaceBlocked = false;
+  private corruptProjectsBlocked = false;
   constructor(
     private readonly kv: KeyValueStore,
     private readonly now: () => number = () => Date.now(),
@@ -78,12 +82,14 @@ export class ProjectStore {
       return parsed.filter(isProject);
     } catch {
       // Corrupt data is never silently overwritten: keep a backup copy.
-      this.kv.setItem(`${PROJECTS_KEY}.corrupt-backup`, raw);
+      try { this.kv.setItem(`${PROJECTS_KEY}.corrupt-backup`, raw); }
+      catch { this.corruptProjectsBlocked = true; }
       return [];
     }
   }
 
   private writeAll(projects: Project[]): void {
+    if (this.corruptProjectsBlocked) throw new ProjectError('Existing project storage is damaged and its backup could not be saved. Export your work before repairing storage.');
     try {
       this.kv.setItem(PROJECTS_KEY, JSON.stringify(projects));
     } catch (err) {
@@ -197,6 +203,22 @@ export class ProjectStore {
   }
 
   // ---- files -------------------------------------------------------------
+
+  loadWorkspace(): WorkspaceSession | null {
+    const raw = this.kv.getItem('beatexe.workspace.v1');
+    const workspace = parseWorkspace(raw);
+    if (raw && !workspace) {
+      try { this.kv.setItem('beatexe.workspace.v1.corrupt-backup', raw); }
+      catch { this.corruptWorkspaceBlocked = true; }
+    }
+    return workspace;
+  }
+
+  saveWorkspace(workspace: WorkspaceSession): boolean {
+    if (this.corruptWorkspaceBlocked) return false;
+    try { this.kv.setItem('beatexe.workspace.v1', JSON.stringify(workspace)); return true; }
+    catch { return false; }
+  }
 
   exportProject(project: Project): string {
     const { formatVersion, name, engine, code, createdAt, updatedAt } = project;

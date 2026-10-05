@@ -19,6 +19,22 @@ export interface Theme {
 
 export const THEMES: Theme[] = [
   {
+    id: 'vaporwave', name: 'Vaporwave Dreams',
+    colors: { bg: '#160F29', bgRaised: '#24183D', fg: '#E9D5FF', fgMuted: '#B39BCC', accent: '#FF94DA', highlight: '#70E8EA', error: '#FF99AB', warn: '#FFDF94', border: '#745398', selection: '#493264' },
+  },
+  {
+    id: 'sakura', name: 'Sakura Terminal',
+    colors: { bg: '#1C1219', bgRaised: '#2C1E27', fg: '#FFE4EF', fgMuted: '#CAA3B5', accent: '#FFABD0', highlight: '#B7E7CD', error: '#FFA099', warn: '#F7DDA8', border: '#795667', selection: '#593745' },
+  },
+  {
+    id: 'cyberpunk', name: 'Cyberpunk Pink',
+    colors: { bg: '#0C0918', bgRaised: '#191128', fg: '#F6DDFF', fgMuted: '#B49CCB', accent: '#FF72D8', highlight: '#61F4ED', error: '#FF8D9C', warn: '#FAE678', border: '#75447D', selection: '#4B245C' },
+  },
+  {
+    id: 'cmd', name: 'Classic CMD',
+    colors: { bg: '#0C0C0C', bgRaised: '#191919', fg: '#E6E6E6', fgMuted: '#AAAAAA', accent: '#FFFFFF', highlight: '#92CFFF', error: '#FF9797', warn: '#FFE699', border: '#777777', selection: '#3B3B3B' },
+  },
+  {
     id: 'midnight',
     name: 'Midnight Terminal',
     colors: {
@@ -71,7 +87,7 @@ export const THEMES: Theme[] = [
 export const DEFAULT_THEME_ID = 'midnight';
 
 export function getTheme(id: string): Theme {
-  return THEMES.find((t) => t.id === id) ?? THEMES[0];
+  return THEMES.find((t) => t.id === id) ?? THEMES.find(t => t.id === DEFAULT_THEME_ID)!;
 }
 
 const VAR_NAMES: Record<keyof ThemeColors, string> = {

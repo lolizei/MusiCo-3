@@ -15,5 +15,5 @@
     "allowImportingTsExtensions": false,
     "types": ["node"]
   },
-  "include": ["src", "tests/unit"]
+  "include": ["src", "tests/unit", "build", "vite.config.ts"]
 }

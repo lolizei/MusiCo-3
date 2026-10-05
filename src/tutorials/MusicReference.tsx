@@ -18,7 +18,7 @@ export function MusicReference({ onTryCode }: { onTryCode(title: string, code: s
       <div className="ref-item"><dt>Tempo</dt><dd><code>setcpm(90/4)</code> sets 90 BPM when you count four beats per cycle. Eight notes in that cycle give two notes per beat.</dd></div>
     </dl>
     <h3 className="step-title melody-heading">Melody starters</h3>
-    <p className="hint">Try loads a fresh project through the usual unsaved-changes check. Press Ctrl+Enter to listen.</p>
+    <p className="hint">Try loads a fresh project through the usual unsaved-changes check. Press RUN to listen.</p>
     {MELODY_STARTERS.map(melody => <article className="melody-card" key={melody.title}>
       <h4>{melody.title}</h4><p>{melody.info}</p><pre className="code-preview">{melody.notes}</pre>
       <button className="tbtn" onClick={() => onTryCode(melody.title, melodyCode(melody.notes))}>[try {melody.title.toLowerCase()}]</button>

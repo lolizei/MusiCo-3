@@ -6,8 +6,12 @@ import os from 'node:os';
 
 const root = path.resolve(process.argv[2]);
 const profile = await mkdtemp(path.join(os.tmpdir(), 'musico-sonic-desktop-'));
-const launch = () => electron.launch({ executablePath: path.resolve(process.argv[3] ?? 'release/win-unpacked/MusiCo-3.exe'),
-  env: { ...process.env, BEAT_TEST_USER_DATA: profile, BEAT_SONIC_PI_ROOT: root } });
+const launch = async () => {
+  const testApp=await electron.launch({ executablePath: path.resolve(process.argv[3] ?? 'release/win-unpacked/MusiCo-3.exe'),
+    env: { ...process.env, BEAT_TEST_USER_DATA: profile, BEAT_SONIC_PI_ROOT: root } });
+  await testApp.evaluate(({BrowserWindow})=>{for(const window of BrowserWindow.getAllWindows())window.hide();});
+  return testApp;
+};
 let app;
 let passed = 0;
 const check = (name, ok) => { assert.ok(ok, name); passed++; console.log(`PASS Sonic Pi desktop: ${name}`); };

@@ -1,9 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { strudelWorkletAssets } from './build/strudelWorklets';
 
 export default defineConfig({
-  plugins: [react()],
-  // Strudel ships audio worklets; keep it out of dep pre-bundling quirks
-  // only if problems show up. Default config is tried first (see README).
+  plugins: [react(), strudelWorkletAssets()],
+  // Production worklets are emitted as local assets for the desktop CSP.
   server: { port: 5173 },
 });

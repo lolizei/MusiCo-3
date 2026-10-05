@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, net, protocol, session } from 'electron';
+import { app, BrowserWindow, dialog, net, protocol, session, ipcMain } from 'electron';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { mkdirSync } from 'node:fs';
@@ -39,21 +39,44 @@ else {
         return new Response(response.body, {status:response.status, headers});
       } catch { return new Response('Not found', {status:404}); }
     });
-    session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
-    session.defaultSession.setPermissionCheckHandler(() => false);
+    const allowedPermissions = new Set(['clipboard-sanitized-write', 'speaker-selection', 'local-fonts']);
+    session.defaultSession.setPermissionRequestHandler((contents, permission, callback) => callback(allowedPermissions.has(permission) && isAppAddress(contents.getURL())));
+    session.defaultSession.setPermissionCheckHandler((contents, permission) => allowedPermissions.has(permission) && !!contents && isAppAddress(contents.getURL()));
     window = new BrowserWindow({
       title: 'MusiCo-3 — BEAT.EXE', width:1280, height:850, minWidth:360, minHeight:500,
       backgroundColor:'#090B12', autoHideMenuBar:true, show:false,
       webPreferences:{sandbox:true, contextIsolation:true, nodeIntegration:false, webSecurity:true, preload:path.join(import.meta.dirname, 'preload.cjs')},
     });
     window.removeMenu();
-    sonicPi = setupSonicPi(() => window, profile);
+    ipcMain.handle('app:quit', event => {
+      if (!window || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || !isAppAddress(event.sender.getURL())) return false;
+      // close() goes through the same unsaved-project/recording guard as X.
+      window.close();
+      return true;
+    });
+    if (process.platform === 'win32') sonicPi = setupSonicPi(() => window, profile);
     window.webContents.setWindowOpenHandler(() => ({action:'deny'}));
     window.webContents.on('will-navigate', (event, address) => { if (!isAppAddress(address)) event.preventDefault(); });
     window.webContents.on('will-attach-webview', event => event.preventDefault());
+    // Electron cancels beforeunload without showing the browser's confirmation.
+    // Give unsaved projects an explicit native choice on close or reload.
+    window.webContents.on('will-prevent-unload', event => {
+      const choice = dialog.showMessageBoxSync(window, {
+        type:'warning', title:'Unsaved music',
+        message:'A project or recording has unsaved changes.',
+        detail:'Save your projects and export recordings before leaving. Project drafts can be recovered next time; recordings cannot.',
+        buttons:['Stay', 'Leave'], defaultId:0, cancelId:0, noLink:true,
+      });
+      if (choice === 1) event.preventDefault();
+    });
     window.once('ready-to-show', () => window.show());
     window.on('closed', () => { window = null; });
-    await window.loadURL(`${origin}/index.html`);
+    try { await window.loadURL(`${origin}/index.html`); }
+    catch (error) {
+      // Reload or window closure can supersede the initial navigation. Electron
+      // rejects the old load with ERR_ABORTED; that is not a startup failure.
+      if (error.code !== 'ERR_ABORTED' && error.errno !== -3) throw error;
+    }
   }).catch(error => { dialog.showErrorBox('MusiCo-3 could not start', error.message); app.quit(); });
   app.on('window-all-closed', () => app.quit());
   app.on('before-quit', event => {

@@ -1,13 +1,14 @@
 # MusiCo-3 for Windows
 
-Extract `MusiCo-3-0.1.1-windows-x64.zip`, open `MusiCo-3-Windows/MusiCo-3` and
+Extract `MusiCo-3-0.2.0-windows-x64.zip`, open `MusiCo-3-Windows/MusiCo-3` and
 double-click `MusiCo-3.exe`. Keep all the files beside it. Windows 10/11,
 64-bit x86 processor. No installation, Node.js or local web server is needed.
 This first build is unsigned; Windows may show an unknown-publisher warning.
 Use a copy obtained from the project owner and compare its SHA-256 checksum.
 The Windows ZIP contains the executable, matching source ZIP, licenses and guides.
 
-Press RUN or Ctrl+Enter; Ctrl+. stops playback. EXAMPLES provides six starting
+Press RUN or the default Ctrl+Enter; Ctrl+. stops playback. SETTINGS changes
+the keyboard mappings and appearance. Project tabs preserve independent drafts. EXAMPLES provides six starting
 points. Ctrl+Shift+P opens commands, theme choices and saved projects. The
 terminal `help` command lists actions. See CUSTOMIZING.md for customization.
 

@@ -23,7 +23,10 @@ The app executable hash is:
 The owner provided [this VirusTotal report](https://www.virustotal.com/gui/file/ec89e5e79b475d9a6a74495ac502eff0859115e44cbd5bd2716564dfee186adf).
 The page could not be read through the available web tool; its detection counts
 are therefore unverified here. This report refers to the original 0.1.0 ZIP,
-not the updated 0.1.1 build containing the beginner guide and Sonic Pi bridge.
+not the 0.1.1 build or the new 0.2.0 development build. None inherits a clean
+scanner verdict from the old report. The 0.2.0 local build adds project tabs and
+customization; compare its own hashes in release/SHA256SUMS.txt and scan that
+exact ZIP before treating it as a public-release candidate.
 
 ## Local detections
 

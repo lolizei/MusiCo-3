@@ -39,7 +39,7 @@ const errorLineField = StateField.define<DecorationSet>({
 const terminalTheme = EditorView.theme(
   {
     '&': { color: 'var(--fg)', backgroundColor: 'transparent', height: '100%', fontSize: 'var(--editor-font-size)' },
-    '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.55' },
+    '.cm-scroller': { fontFamily: 'var(--font-editor, var(--font-mono))', lineHeight: '1.55' },
     '.cm-content': { caretColor: 'var(--accent)' },
     '.cm-cursor, .cm-dropCursor': { borderLeft: '2px solid var(--accent)' },
     '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection': { backgroundColor: 'var(--selection) !important' },
@@ -77,14 +77,14 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
   const propsRef = useRef(props);
   propsRef.current = props;
   const language = useRef(new Compartment());
+  const states = useRef(new Map<string, EditorState>());
+  const activeSession = useRef(props.sessionId);
   const languageExtensions = () => propsRef.current.language === 'ruby' ?
     [StreamLanguage.define(ruby)] : [javascript(), javascriptLanguage.data.of({ autocomplete: strudelCompletions })];
 
   const buildExtensions = (): Extension[] => [
     Prec.highest(
       keymap.of([
-        { key: 'Mod-Enter', run: () => (propsRef.current.onRun(), true) },
-        { key: 'Mod-.', run: () => (propsRef.current.onStop(), true) },
         { key: 'Mod-z', run: undo, shift: redo, preventDefault: true },
       ]),
     ),
@@ -120,6 +120,24 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
   }, []);
 
   useEffect(() => {
+    const view = viewRef.current;
+    if (!view || activeSession.current === props.sessionId) return;
+    if (activeSession.current) states.current.set(activeSession.current, view.state);
+    activeSession.current = props.sessionId;
+    const cached = props.sessionId ? states.current.get(props.sessionId) : undefined;
+    view.setState(cached && cached.doc.toString() === props.initialCode ? cached :
+      EditorState.create({ doc: props.initialCode, extensions: buildExtensions() }));
+    const head = view.state.selection.main.head;
+    const line = view.state.doc.lineAt(head);
+    propsRef.current.onCursor?.(line.number, head - line.from + 1);
+  }, [props.sessionId]);
+
+  useEffect(() => {
+    if (!props.openSessionIds) return;
+    for (const id of states.current.keys()) if (!props.openSessionIds.includes(id)) states.current.delete(id);
+  }, [props.openSessionIds]);
+
+  useEffect(() => {
     viewRef.current?.dispatch({ effects: language.current.reconfigure(languageExtensions()) });
   }, [props.language]);
 
@@ -150,6 +168,11 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
       }
       view.dispatch({ changes: { from, insert }, selection: EditorSelection.cursor(from + insert.length), scrollIntoView: true, annotations: isolateHistory.of('full') });
       view.focus();
+    },
+    prependSnippet: (text: string) => {
+      const view = viewRef.current;
+      if (!view || view.state.doc.toString().includes(text.trim())) return;
+      view.dispatch({ changes: { from: 0, insert: text }, selection: EditorSelection.cursor(0), scrollIntoView: true, annotations: isolateHistory.of('full') });
     },
     focus: () => viewRef.current?.focus(),
     markError: (line: number | null) => viewRef.current?.dispatch({ effects: setErrorLine.of(line) }),

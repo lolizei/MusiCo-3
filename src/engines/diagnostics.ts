@@ -5,13 +5,18 @@ export function isResourceFailure(message: string): boolean {
   return /Failed to fetch|fetch failed|NetworkError|Network request failed|Load failed|error loading ["']https?:|could not load|Unable to decode audio|EncodingError/i.test(message);
 }
 
+export function isAudioFailure(message: string): boolean {
+  return /AudioWorklet|worklet.*module|processor.*not.*(?:defined|registered)|audio (?:initialization|initialisation) failed/i.test(message);
+}
+
 /** Turns whatever an engine threw or logged into a diagnostic, with a line number if one is present. */
 export function toDiagnostic(err: unknown): EngineDiagnostic {
   let message =
     err instanceof Error ? err.message : typeof err === 'string' ? err : safeStringify(err);
   message = message.replace(/^\s*\[eval\]\s*(error:)?\s*/i, '').trim() || 'Unknown error';
   const diag: EngineDiagnostic = { message };
-  if (isResourceFailure(message)) diag.kind = 'resource';
+  if (isAudioFailure(message)) diag.kind = 'audio';
+  else if (isResourceFailure(message)) diag.kind = 'resource';
   else if (/sound .* not found|not found! Is it loaded/i.test(message)) diag.kind = 'sound';
 
   const loc = (err as { loc?: { line?: number; column?: number } } | null)?.loc;

@@ -1,0 +1,21 @@
+import { access, cp, mkdir, mkdtemp, readFile, writeFile, chmod } from 'node:fs/promises';
+import path from 'node:path';
+import { steamLinuxBuildFiles } from './steam-config.mjs';
+
+const root = path.resolve(import.meta.dirname, '..');
+const project = JSON.parse(await readFile(path.join(root, 'steam/project.json'), 'utf8'));
+const pkg = JSON.parse(await readFile(path.join(root, 'release/linux/PACKAGE.json'), 'utf8'));
+const files = steamLinuxBuildFiles(project, pkg.version);
+const contentSource = path.resolve(pkg.content);
+const expectedRoot = path.join(root, 'release/linux') + path.sep;
+if (!contentSource.startsWith(expectedRoot) || pkg.platform !== 'linux' || pkg.arch !== 'x64') throw Error('Expected the local Linux release content.');
+for (const file of ['MusiCo-3/musico-3', pkg.source, 'LICENSE', 'THIRD_PARTY_NOTICES.md']) await access(path.join(contentSource, file));
+const stage = await mkdtemp(path.join(root, 'release', `steam-linux-${project.appId}-`));
+await cp(contentSource, path.join(stage, 'content'), { recursive: true });
+for (const file of ['musico-3', 'chrome_crashpad_handler', 'chrome-sandbox']) await chmod(path.join(stage, 'content/MusiCo-3', file), 0o755);
+await mkdir(path.join(stage, 'scripts')); await mkdir(path.join(stage, 'build-output'));
+await writeFile(path.join(stage, 'scripts', `app_build_${project.appId}.vdf`), files.app);
+await writeFile(path.join(stage, 'scripts', `depot_build_${project.linuxDepotId}.vdf`), files.depot);
+await writeFile(path.join(stage, 'PREPARATION.json'), JSON.stringify({ ...project, version: pkg.version, previewOnly: true, runtimeTested: pkg.runtimeTested, launchExecutable: pkg.launchExecutable }, null, 2) + '\n');
+await writeFile(path.join(stage, 'README.txt'), `Linux preview only; no upload or branch activation occurred.\nFor upload, use a Linux machine: copy this stage, chmod 755 content/MusiCo-3/{musico-3,chrome_crashpad_handler,chrome-sandbox}, then run the preview VDF with SteamCMD.\nAfter verifying Linux launch/audio and preview, an actual upload requires Preview 0. Keep the existing Windows manifest when making a combined build live.\nSee docs/LINUX.md.\n`);
+console.log(`Linux Steam preview prepared: ${stage}\nNothing uploaded. Linux runtime testing is pending.\nExecutable attributes are explicit: verify flag 0x20 on the app and both helpers in SteamCMD preview. Windows uploads must retain these properties.`);

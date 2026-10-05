@@ -4,6 +4,8 @@ export interface CodeEditorHandle {
   setCode(code: string): void;
   /** Inserts on a new line (or chains a `.method` onto the current line). Undoable. */
   insertSnippet(text: string): void;
+  /** Inserts setup before the song without resetting undo history. */
+  prependSnippet(text: string): void;
   focus(): void;
   /** Highlights a 1-based line as an error, or clears it with null. */
   markError(line: number | null): void;
@@ -11,6 +13,8 @@ export interface CodeEditorHandle {
 
 export interface CodeEditorProps {
   initialCode: string;
+  sessionId?: string;
+  openSessionIds?: string[];
   language?: 'javascript' | 'ruby';
   onChange(code: string): void;
   onRun(): void;

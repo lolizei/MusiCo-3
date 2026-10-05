@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CodeEditor, type CodeEditorHandle } from '../editor/CodeEditor';
+import { SampleManager } from '../samples/SampleManager';
+import { PianoRoll } from '../editor/piano/PianoRoll';
+import { NoteView } from '../editor/piano/NoteView';
+import { useSnippetPreview } from '../tutorials/useSnippetPreview';
+import { snippetPreviewCode } from '../tutorials/preview';
+import { Modal } from '../ui/Modal';
 import { useEngine } from '../engines/useEngine';
 import { explainError } from '../engines/explain';
 import { STRUDEL_NAMES } from '../engines/strudel/functions';
@@ -8,11 +14,15 @@ import type { EngineDiagnostic } from '../engines/types';
 import { openBrowserStorage } from '../projects/browserStorage';
 import { ProjectError, ProjectStore, validateName, type Project } from '../projects/store';
 import { useProjectSession } from '../projects/useProjectSession';
-import { EXAMPLES, getExample, NEW_PROJECT_TEMPLATE } from '../projects/examples';
-import { SONIC_PI_TEMPLATE } from '../engines/sonic-pi/content';
+import { ProjectTabs } from '../projects/ProjectTabs';
+import { tabDirty } from '../projects/tabs';
+import { EXAMPLES, getExample } from '../projects/examples';
+import { EXTENSION_ISSUES } from '../engines/loadExtensions';
 import { useSettings } from '../settings/useSettings';
 import { applySettingFromText } from '../settings/settings';
-import { THEMES } from '../themes/themes';
+import { SettingsPanel } from '../settings/SettingsPanel';
+import { shortcutLabel } from '../settings/shortcuts';
+import { availableThemes } from '../themes/themeFiles';
 import { Terminal, type TerminalHandle } from '../terminal/Terminal';
 import { useTerminalLog } from '../terminal/useTerminalLog';
 import { executeCommand, type CommandContext, type CompletionData } from '../terminal/commands';
@@ -20,6 +30,8 @@ import { BeginnerPanel } from '../tutorials/BeginnerPanel';
 import { Dialog, type DialogSpec } from '../ui/Dialog';
 import { StatusBar, TitleBar, Toolbar } from '../ui/Chrome';
 import { BOOT_BANNER } from '../ui/ascii';
+import { StartupGreeting } from '../ui/StartupGreeting';
+import { AudioControls } from '../audio/AudioControls';
 import { useShortcuts } from './useShortcuts';
 import { CommandPalette } from './CommandPalette';
 import { buildPaletteEntries, type PaletteEntry } from './palette';
@@ -30,7 +42,7 @@ export default function App() {
   // ---- core state ---------------------------------------------------------------
   const storage = useMemo(() => openBrowserStorage(), []);
   const store = useMemo(() => new ProjectStore(storage.kv), [storage]);
-  const { settings, update: updateSettings, replace: replaceSettings } = useSettings(storage.kv);
+  const { settings, update: updateSettings, replace: replaceSettings, settingsSaved } = useSettings(storage.kv);
   const term = useTerminalLog();
   const session = useProjectSession(store);
 
@@ -41,7 +53,12 @@ export default function App() {
   const [dialog, setDialog] = useState<{ key: number; spec: DialogSpec } | null>(null);
   const dialogCounter = useRef(0);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [panelOpen, setPanelOpen] = useState(settings.beginnerMode);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [pianoOpen, setPianoOpen] = useState(false);
+  const [samplesOpen, setSamplesOpen] = useState(false);
+  const [copyFallback, setCopyFallback] = useState<string | null>(null);
+  const panelOpen = settings.beginnerMode;
+  const setPanelOpen = useCallback((open: boolean) => updateSettings({ beginnerMode: open }), [updateSettings]);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [cursor, setCursor] = useState({ line: 1, column: 1 });
 
@@ -63,7 +80,7 @@ export default function App() {
         print(ex.headline, 'error');
         ex.details.forEach((d) => print(`  ${d}`, 'warn'));
         print(`  technical: ${ex.technical}`, 'info');
-        print('  need help? press F1 ♡', 'info');
+        print('  need help? open HELP ♡', 'info');
       } else {
         print(`error${ex.line ? ` (line ${ex.line})` : ''}: ${ex.technical}`, 'error');
       }
@@ -89,20 +106,32 @@ export default function App() {
   );
 
   // ---- playback -------------------------------------------------------------------
+  const [noteLabel, setNoteLabel] = useState('');
+  const audition = useSnippetPreview(session.activeId, engine, (title, result) => {
+    if (result.ok) { setNoteLabel(`preview: ${title}`); print(`♫ preview: ${title}. Editor unchanged; STOP silences it, RUN plays your song.`, 'ok'); }
+    else {
+      // Preview errors belong to snippet code, not the editor's line numbers.
+      print(`Preview failed: ${result.error.message}`, 'error');
+    }
+  });
   const run = useCallback(async () => {
     if (!engine.available) {
       print(engine.descriptor?.unavailableReason ?? 'this engine is not available', 'warn');
       return;
     }
     const code = editorRef.current?.getCode() ?? live.current.session.code;
+    audition.cancel();
+    const tabId = live.current.session.activeId;
     editorRef.current?.markError(null);
     const wasPlaying = engine.isPlaying();
     const res = await engine.run(code);
+    if (live.current.session.activeId !== tabId) return;
     if (res.ok) {
+      setNoteLabel(live.current.session.project.name);
       print(wasPlaying ? engine.descriptor?.capabilities.liveUpdate
         ? '↻ updated: your changes are applied without restarting playback'
-        : '↻ replaced the previous music (ctrl+. to stop)'
-        : '▶ playing ♡  (ctrl+. to stop)', 'ok');
+        : `↻ replaced the previous music (${shortcutLabel(live.current.settings.shortcuts.stop)} to stop)`
+        : `▶ playing ♡  (${shortcutLabel(live.current.settings.shortcuts.stop)} to stop)`, 'ok');
     } else {
       printError(res.error);
       if (wasPlaying && engine.isPlaying()) print('the previous version keeps playing until you fix it or press stop', 'info');
@@ -110,7 +139,9 @@ export default function App() {
   }, [engine, print, printError]);
 
   const stop = useCallback(() => {
-    if (!engine.isPlaying()) {
+    const wasPlaying = engine.isPlaying();
+    audition.cancel();
+    if (!wasPlaying) {
       engine.stop(); // harmless; also silences anything left over
       print('nothing is playing', 'info');
       return;
@@ -125,8 +156,7 @@ export default function App() {
   }, [engine, run]);
 
   // ---- project actions --------------------------------------------------------------
-  const showInEditor = useCallback((code: string) => {
-    editorRef.current?.setCode(code);
+  const showInEditor = useCallback((_code: string) => {
     editorRef.current?.markError(null);
     editorRef.current?.focus();
   }, []);
@@ -150,20 +180,21 @@ export default function App() {
   );
 
   const switchProject = useCallback(
-    (load: () => Project, message: (p: Project) => string) =>
-      guardUnsaved(() =>
+    (load: () => Project, message: (p: Project) => string, preserve = false) => {
+      const apply = () =>
         withErrors(() => {
           engine.stop();
           const p = load();
           showInEditor(p.code);
           print(message(p), 'ok');
-        }),
-      ),
+        });
+      if (preserve) apply(); else guardUnsaved(apply);
+    },
     [guardUnsaved, withErrors, engine, showInEditor, print],
   );
 
   const newProject = useCallback(
-    (name?: string) => switchProject(() => session.newProject(name), (p) => `new project: ${p.name}.beat`),
+    (name?: string) => switchProject(() => session.newProject(name), (p) => `new tab: ${p.name}.beat`, true),
     [switchProject, session],
   );
 
@@ -209,13 +240,14 @@ export default function App() {
     (name?: string) => {
       const code = editorRef.current?.getCode() ?? live.current.session.code;
       const apply = (n: string) => {
+        engine.stop();
         const p = live.current.session.saveAs(n, code);
         print(`saved a copy as ${p.name}.beat ♡`, 'ok');
       };
       if (name) withErrors(() => apply(name));
       else askName('save as', store.uniqueName(`${live.current.session.project.name}-copy`), 'save copy', apply);
     },
-    [askName, store, withErrors, print],
+    [askName, store, withErrors, print, engine],
   );
 
   const rename = useCallback(
@@ -237,10 +269,39 @@ export default function App() {
         print(`${s.project.name}.beat is already open`, 'info');
         return;
       }
-      switchProject(() => s.open(id), (p) => `opened ${p.name}.beat`);
+      switchProject(() => s.open(id), (p) => `opened ${p.name}.beat`, true);
     },
     [switchProject, print],
   );
+
+  const selectTab = useCallback((id: string) => {
+    if (id === live.current.session.activeId) return;
+    withErrors(() => {
+      engine.stop();
+      const p = live.current.session.select(id);
+      print(`switched to ${p.name}.beat. Press RUN to play.`, 'info');
+    });
+  }, [withErrors, engine, print]);
+
+  const closeProjectTab = useCallback((id: string) => {
+    const tab = live.current.session.tabs.find(t => t.project.id === id);
+    if (!tab) return;
+    const close = () => withErrors(() => {
+      if (live.current.session.activeId === id) engine.stop();
+      live.current.session.close(id);
+    });
+    if (tabDirty(tab) || !tab.persisted) openDialog({
+      type: 'confirm', title: 'close tab?', message: `Close "${tab.project.name}" and discard its unsaved work? Save or export first to keep it.`,
+      confirmLabel: 'close and discard', cancelLabel: 'keep editing', danger: true, onConfirm: close,
+    });
+    else close();
+  }, [withErrors, engine, openDialog]);
+
+  const cycleTab = (direction: number) => {
+    const s = live.current.session;
+    const index = s.tabs.findIndex(t => t.project.id === s.activeId);
+    selectTab(s.tabs[(index + direction + s.tabs.length) % s.tabs.length].project.id);
+  };
 
   const confirmDelete = useCallback(
     (id: string) => {
@@ -272,7 +333,7 @@ export default function App() {
     openDialog({
       type: 'picker',
       title: 'open project',
-      empty: 'No saved projects yet. Press Ctrl+S to save the one you are working on.',
+      empty: 'No saved projects yet. Press SAVE to save the one you are working on.',
       items: store.list().map((p) => ({ id: p.id, label: p.name, detail: new Date(p.updatedAt).toLocaleString() })),
       onSelect: openProject,
       deleteLabel: 'delete…',
@@ -294,14 +355,14 @@ export default function App() {
       }
       const ex = getExample(query);
       if (!ex) return print(`no example "${query}". type examples to see the list`, 'warn');
-      switchProject(() => live.current.session.loadExample(ex), () => `loaded example: ${ex.title}. press ctrl+enter to hear it ♡`);
+      switchProject(() => live.current.session.loadExample(ex), () => `loaded example: ${ex.title}. press RUN to hear it ♡`);
     },
     [openDialog, print, switchProject],
   );
 
   const tryCode = useCallback(
     (title: string, code: string) =>
-      switchProject(() => live.current.session.loadCode(title, code, live.current.session.project.engine), () => 'loaded into the editor. press ctrl+enter to hear it ♡'),
+      switchProject(() => live.current.session.loadCode(title, code, live.current.session.project.engine), () => 'loaded into the editor. press RUN to hear it ♡'),
     [switchProject],
   );
 
@@ -325,8 +386,10 @@ export default function App() {
     async (file: File | undefined) => {
       if (!file) return;
       if (file.size > MAX_IMPORT_BYTES) return print('that file is too big to be a BEAT.EXE project', 'error');
-      const text = await file.text();
-      switchProject(() => live.current.session.importText(text), (p) => `imported ${p.name}.beat ♡`);
+      try {
+        const text = await file.text();
+        switchProject(() => live.current.session.importText(text), (p) => `imported ${p.name}.beat ♡`, true);
+      } catch (err) { print(`Could not read that project file: ${err instanceof Error ? err.message : 'unknown error'}`, 'error'); }
     },
     [print, switchProject],
   );
@@ -337,6 +400,12 @@ export default function App() {
   }, []);
 
   // ---- terminal command context ------------------------------------------------
+  const copyCode = useCallback(async () => {
+    const code = editorRef.current?.getCode() ?? live.current.session.code;
+    try { await navigator.clipboard.writeText(code); print('editor code copied ♡', 'ok'); }
+    catch { setCopyFallback(code); print('clipboard unavailable: select the code and press Ctrl+C', 'warn'); }
+  }, [print]);
+
   const ctxRef = useRef<CommandContext>(null as unknown as CommandContext);
   ctxRef.current = {
     print,
@@ -379,11 +448,11 @@ export default function App() {
       if (!d) return print(`unknown engine "${id}"`, 'warn');
       if (!d.available) return print(`${d.name}: ${d.unavailableReason}`, 'warn');
       if (d.id === session.project.engine) return print(`${d.name} is already the engine for this project`, 'info');
-      switchProject(() => live.current.session.loadCode(d.id === 'sonic-pi' ? 'sonic-pi-song' : 'strudel-song',
-        d.id === 'sonic-pi' ? SONIC_PI_TEMPLATE : NEW_PROJECT_TEMPLATE, d.id),
-        () => `new ${d.name} project. ${d.id === 'sonic-pi' ? 'RUN connects to your separate Sonic Pi 5.0.0 installation.' : 'press ctrl+enter to play ♡'}`);
+      switchProject(() => live.current.session.loadCode(`${d.id}-song`,
+        d.starterCode ?? '', d.id),
+        () => `new ${d.name} project. ${d.id === 'sonic-pi' ? 'RUN connects to your separate Sonic Pi 5.0.0 installation.' : 'press RUN to play ♡'}`);
     },
-    listThemes: () => THEMES.map((t) => ({ id: t.id, name: t.name, current: t.id === settings.themeId })),
+    listThemes: () => availableThemes(settings.customTheme).map((t) => ({ id: t.id, name: t.name, current: t.id === settings.themeId })),
     set: (key, value) => {
       const r = applySettingFromText(settings, key, value);
       if (!r.ok) return print(r.error, 'warn');
@@ -397,6 +466,9 @@ export default function App() {
       `mode        ${settings.beginnerMode ? 'beginner' : 'advanced'}`,
       `crt         ${settings.crtEffects ? 'on' : 'off'}`,
       `animations  ${settings.animations ? 'on' : 'off'}`,
+      `startup     ${settings.startupAnimation ? 'on' : 'off'} (next launch)`,
+      `mascot      ${settings.terminalAnimation} (during playback)`,
+      `mascotspeed  ${settings.terminalAnimationSpeed}`,
     ],
     tutorial: () => {
       updateSettings({ beginnerMode: true });
@@ -404,17 +476,31 @@ export default function App() {
       setTutorialStep(0);
       print('tutorial opened on the right. follow the steps ♡', 'ok');
     },
-    help: () => print('commands:', 'info'),
+    help: () => {
+      print('commands:', 'info');
+      print(`keys: ${shortcutLabel(settings.shortcuts.run)} run · ${shortcutLabel(settings.shortcuts.stop)} stop · ${shortcutLabel(settings.shortcuts.save)} save`, 'info');
+    },
+    customize: () => setSettingsOpen(true),
+    copyCode: () => void copyCode(),
+    pianoRoll: () => setPianoOpen(true),
+    sampleManager: () => {
+      if (live.current.session.project.engine !== 'strudel') { print('Sample sources are available for Strudel projects.', 'info'); return; }
+      setSamplesOpen(true);
+    },
+    quit: () => {
+      if (!window.desktopApp) { print('quit is available in the desktop app. Save or export, then close this browser tab.', 'info'); return; }
+      void window.desktopApp.quit().catch(() => print('Could not close the app. Use the window close button.', 'error'));
+    },
   };
 
   const getCompletionData = useCallback(
     (): CompletionData => ({
-      themes: THEMES.map((t) => t.id),
+      themes: availableThemes(settings.customTheme).map((t) => t.id),
       examples: EXAMPLES.map((e) => e.id),
       projects: store.list().map((p) => p.name),
       engines: ENGINES.map((e) => e.id),
     }),
-    [store],
+    [store, settings.customTheme],
   );
 
   // ---- startup -------------------------------------------------------------------
@@ -425,7 +511,8 @@ export default function App() {
     print(BOOT_BANNER, 'art');
     print('SYSTEM BOOT COMPLETE...', 'info');
     print(`AUDIO ENGINE: ${getEngineDescriptor(session.project.engine)?.name.toUpperCase() ?? session.project.engine}`, 'info');
-    print('press ctrl+enter to play · type help for commands', 'ok');
+    print('press RUN to play · type help for commands', 'ok');
+    for (const issue of EXTENSION_ISSUES) print(`Engine extension skipped (${issue.file}): ${issue.message}`, 'warn');
     if (!storage.persistent) {
       print('browser storage is blocked, so saved projects will vanish on reload. use export to keep your work.', 'warn');
     }
@@ -434,13 +521,14 @@ export default function App() {
       openDialog({
         type: 'confirm',
         title: 'recover work?',
-        message: `Found unsaved changes to "${draft.name}" from ${new Date(draft.savedAt).toLocaleString()}. Restore them?`,
+        message: `Found unsaved changes in ${session.recoveryCount} tab(s), including "${draft.name}". Restore all of them?`,
         confirmLabel: 'restore',
         cancelLabel: 'discard',
         onConfirm: () => {
-          session.resolveDraft(true);
-          showInEditor(draft.code);
-          print(`restored unsaved work for ${draft.name}. press ctrl+s to save it`, 'ok');
+          const restored = session.resolveDraft(true);
+          if (restored && restored.id === session.activeId) editorRef.current?.setCode(restored.code);
+          showInEditor(restored?.code ?? draft.code);
+          print(`restored unsaved work for ${draft.name}. press SAVE to save it`, 'ok');
         },
         onCancel: () => session.resolveDraft(false),
       });
@@ -451,7 +539,7 @@ export default function App() {
   // Warn before closing the tab with unsaved changes.
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (!live.current.session.dirty) return;
+      if (!live.current.session.anyDirty) return;
       e.preventDefault();
       e.returnValue = '';
     };
@@ -469,15 +557,19 @@ export default function App() {
       newProject: () => newProject(),
       openPalette: () => setPaletteOpen(true),
       help: showHelp,
+      settings: () => setSettingsOpen(true),
+      nextTab: () => cycleTab(1),
+      previousTab: () => cycleTab(-1),
     },
-    !dialog && !paletteOpen,
+    !dialog && !paletteOpen && !settingsOpen && !pianoOpen && !samplesOpen && copyFallback === null,
+    settings.shortcuts,
   );
 
   const playing = engine.state === 'playing';
   const canRun = engine.available && (engine.state !== 'error' || session.project.engine === 'sonic-pi') && !!engine.descriptor?.capabilities.run;
 
   const paletteEntries = paletteOpen ? buildPaletteEntries({
-    themes: THEMES, examples: EXAMPLES, projects: store.list(), engines: ENGINES, canRun, playing,
+    themes: availableThemes(settings.customTheme), examples: EXAMPLES, projects: store.list(), engines: ENGINES, canRun, playing,
   }) : [];
 
   const selectPaletteEntry = (entry: PaletteEntry) => {
@@ -491,7 +583,8 @@ export default function App() {
       else { editorRef.current?.focus(); executeCommand(target.command, ctxRef.current); }
     } else if (target.action === 'focus-terminal') terminalRef.current?.focus();
     else if (target.action === 'help') { editorRef.current?.focus(); showHelp(); }
-    else if (target.action === 'toggle-help') { setPanelOpen(open => !open); editorRef.current?.focus(); }
+    else if (target.action === 'toggle-help') { setPanelOpen(!panelOpen); editorRef.current?.focus(); }
+    else if (target.action === 'settings') setSettingsOpen(true);
     else {
       const next = !settings.beginnerMode;
       updateSettings({ beginnerMode: next }); setPanelOpen(next); editorRef.current?.focus();
@@ -500,6 +593,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <StartupGreeting enabled={settings.startupAnimation} animations={settings.animations} />
       <TitleBar
         projectName={session.project.name}
         dirty={session.dirty}
@@ -527,34 +621,59 @@ export default function App() {
         onExamples={() => loadExample()}
         onHelp={showHelp}
         onPalette={() => setPaletteOpen(true)}
+        onSettings={() => setSettingsOpen(true)}
+        onCopy={() => void copyCode()}
+        onPianoRoll={() => setPianoOpen(true)}
+        onSamples={() => setSamplesOpen(true)}
+        samplesEnabled={session.project.engine === 'strudel'}
+        shortcuts={settings.shortcuts}
+        liveUpdate={!!engine.descriptor?.capabilities.liveUpdate}
       />
       <main className={`workspace ${panelOpen ? 'with-panel' : ''}`}>
-        <section className="frame editor-frame" aria-label="Code editor">
+        <section className="frame editor-frame" aria-label="Code editor" id="music-editor-panel" role="tabpanel" aria-labelledby={'tab-' + session.activeId}>
           <h2 className="frame-title">project: {session.project.name}.beat</h2>
+          <ProjectTabs tabs={session.tabs} activeId={session.activeId} onSelect={selectTab} onClose={closeProjectTab} onNew={() => newProject()} />
+          {!session.recoveryAvailable && <p className="settings-error" role="alert">Draft storage is full or blocked. Export your work to keep it safe.</p>}
           <CodeEditor
             ref={editorRef}
             initialCode={session.code}
+            sessionId={session.activeId}
+            openSessionIds={session.tabs.map(t => t.project.id)}
             language={engine.descriptor?.language}
             onChange={session.setCode}
             onRun={() => void run()}
             onStop={stop}
             onCursor={(line, column) => setCursor({ line, column })}
           />
+          {session.project.engine === 'strudel' && <NoteView snapshot={engine.getPianoSnapshot()} label={noteLabel} getLiveFrame={engine.getLivePianoFrame} playing={playing} animations={settings.animations} />}
         </section>
         {panelOpen && (
           <BeginnerPanel
             key={session.project.engine}
+            kv={storage.kv}
+            persistent={storage.persistent}
+            getCode={() => editorRef.current?.getCode() ?? live.current.session.code}
+            playing={playing}
             engineId={session.project.engine}
+            shortcuts={settings.shortcuts}
             step={tutorialStep}
             onStepChange={setTutorialStep}
             onTryCode={tryCode}
             onInsert={(code) => editorRef.current?.insertSnippet(code)}
-            onClose={() => setPanelOpen(false)}
+            previewTitle={engine.state === 'blocked' || engine.state === 'error' ? null : audition.title}
+            onPreview={(title, code) => void audition.preview(title, snippetPreviewCode(code))}
+            onStopPreview={stop}
           />
         )}
       </main>
       <Terminal
         ref={terminalRef}
+        audioControls={<AudioControls getOutput={engine.getAudioOutput} state={engine.state} supported={!!engine.descriptor?.capabilities.visualization}
+          volume={settings.masterVolume} muted={settings.masterMuted} onVolume={masterVolume => updateSettings({ masterVolume })}
+          onMute={() => updateSettings({ masterMuted: !settings.masterMuted })} name={session.project.name} />}
+        playing={playing}
+        animation={settings.terminalAnimation}
+        animationSpeed={settings.terminalAnimationSpeed}
         lines={term.lines}
         onCommand={(line) => executeCommand(line, ctxRef.current)}
         getCompletionData={getCompletionData}
@@ -580,7 +699,27 @@ export default function App() {
       />
       {settings.crtEffects && <div className="crt-overlay" aria-hidden="true" />}
       {paletteOpen && <CommandPalette entries={paletteEntries} onClose={() => setPaletteOpen(false)} onSelect={selectPaletteEntry} />}
+      {settingsOpen && <SettingsPanel settings={settings} settingsSaved={settingsSaved && storage.persistent} onClose={() => setSettingsOpen(false)} onUpdate={patch => {
+        updateSettings(patch);
+        if (patch.beginnerMode !== undefined) setPanelOpen(patch.beginnerMode);
+      }} />}
       {dialog && <Dialog key={dialog.key} spec={dialog.spec} onClose={() => setDialog(null)} />}
+      {pianoOpen && <PianoRoll kv={storage.kv} persistent={storage.persistent} onClose={() => setPianoOpen(false)} onCreate={code => {
+        switchProject(() => live.current.session.newFromCode('piano-roll', code, 'strudel'), () => 'piano sketch opened in a new Strudel tab. Press RUN to play ♡', true);
+        setPianoOpen(false);
+      }} />}
+      {samplesOpen && <SampleManager kv={storage.kv} persistent={storage.persistent} onClose={() => setSamplesOpen(false)} onInsert={code => {
+        editorRef.current?.prependSnippet(code);
+        setSamplesOpen(false);
+        print('sample loader added above your song. Review the source, then RUN; COPY CODE includes it.', 'info');
+      }} onCreate={(name, code) => {
+        switchProject(() => live.current.session.newFromCode(name.slice(0, 60), code, 'strudel'), () => 'sample demo opened in a new Strudel tab. Press RUN to play ♡', true);
+        setSamplesOpen(false);
+      }} />}
+      {copyFallback !== null && <Modal title="copy editor code" onClose={() => setCopyFallback(null)}>
+        <p>Select the code below and press Ctrl+C to copy it.</p>
+        <textarea className="piano-code" aria-label="Code to copy" readOnly value={copyFallback} onFocus={e => e.target.select()} />
+      </Modal>}
     </div>
   );
 }

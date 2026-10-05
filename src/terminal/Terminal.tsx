@@ -1,5 +1,7 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type KeyboardEvent } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import type { TerminalLine } from './useTerminalLog';
+import { TerminalAnimation } from './TerminalAnimation';
+import type { TerminalAnimationId, AnimationSpeed } from './animations';
 import { applyCompletion, commonPrefix, completeCommandLine, type CompletionData } from './commands';
 
 export interface TerminalHandle {
@@ -8,6 +10,10 @@ export interface TerminalHandle {
 }
 
 interface Props {
+  audioControls?: ReactNode;
+  playing: boolean;
+  animation: TerminalAnimationId;
+  animationSpeed: AnimationSpeed;
   lines: TerminalLine[];
   onCommand(line: string): void;
   /** Called on Tab, so project names are always current. */
@@ -74,10 +80,14 @@ export const Terminal = forwardRef<TerminalHandle, Props>(function Terminal(prop
   return (
     <section className="frame terminal" aria-label="Command terminal">
       <h2 className="frame-title">terminal</h2>
+      {props.audioControls}
+      <div className="terminal-body">
       <div
         className="terminal-log"
         ref={logRef}
         role="log"
+        tabIndex={0}
+        aria-label="Terminal output"
         aria-live="polite"
         data-testid="terminal-log"
         onClick={() => inputRef.current?.focus()}
@@ -87,6 +97,8 @@ export const Terminal = forwardRef<TerminalHandle, Props>(function Terminal(prop
             {l.text || '\u00a0'}
           </div>
         ))}
+      </div>
+      {props.playing && <TerminalAnimation selection={props.animation} speed={props.animationSpeed} />}
       </div>
       <label className="terminal-input">
         <span className="prompt" aria-hidden="true">
